@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+﻿import React, { useState, useEffect, useRef } from "react";
 import {
   UploadCloud,
   CheckCircle2,
@@ -29,10 +29,12 @@ import {
   FolderPlus,
   X,
   SlidersHorizontal,
+  Copy,
 } from "lucide-react";
 import SuggestionTooltip from "./Tooltip";
 import ColumnMapperModal from "./ColumnMapperModal";
 import ReporteGeneralModal from "./ReporteGeneralModal";
+import DuplicadosModal from "./DuplicadosModal";
 import {
   uploadEstadoCuenta,
   confirmarMovimiento,
@@ -53,6 +55,8 @@ import {
   fetchBancos,
   createBanco,
   deleteBanco,
+  fetchDuplicados,
+  resolverDuplicados,
 } from "../api";
 
 export default function ConciliacionPanel({
@@ -60,7 +64,7 @@ export default function ConciliacionPanel({
   inmuebles,
   onRefreshInmuebles,
 }) {
-  // Estados de Navegación y Vistas: 'carpetas' | 'conciliando' | 'nueva'
+  // Estados de NavegaciÃ³n y Vistas: 'carpetas' | 'conciliando' | 'nueva'
   const [vista, setVista] = useState("carpetas");
   const [carpetas, setCarpetas] = useState([]);
   const [loadingCarpetas, setLoadingCarpetas] = useState(false);
@@ -73,7 +77,7 @@ export default function ConciliacionPanel({
     }));
   };
 
-  // Estados de Conciliación Activa
+  // Estados de ConciliaciÃ³n Activa
   const [loading, setLoading] = useState(false);
   const [estadoCuenta, setEstadoCuenta] = useState(null);
   const [movimientos, setMovimientos] = useState([]);
@@ -117,7 +121,7 @@ export default function ConciliacionPanel({
   };
 
   const handleEliminarBanco = async (bancoNom) => {
-    if (!confirm(`¿Eliminar el banco "${bancoNom}" de tu lista personalizada?`)) return;
+    if (!confirm(`Â¿Eliminar el banco "${bancoNom}" de tu lista personalizada?`)) return;
     try {
       await deleteBanco(bancoNom);
       if (bancoSeleccionado === bancoNom) {
@@ -134,7 +138,7 @@ export default function ConciliacionPanel({
   const [editandoTitulo, setEditandoTitulo] = useState(false);
   const [tituloTemp, setTituloTemp] = useState("");
 
-  // Estados de Gestión Integral de Carpetas
+  // Estados de GestiÃ³n Integral de Carpetas
   const [editandoCarpetaId, setEditandoCarpetaId] = useState(null);
   const [nombreCarpetaTemp, setNombreCarpetaTemp] = useState("");
   const [modalFusionar, setModalFusionar] = useState({ open: false, carpetaOrigen: null, carpetaDestinoId: "" });
@@ -153,6 +157,7 @@ export default function ConciliacionPanel({
   // Estados de Mapeo Interactivo de Columnas y Reporte General
   const [modalColumnMapper, setModalColumnMapper] = useState({ open: false, file: null });
   const [modalReporteGeneral, setModalReporteGeneral] = useState(false);
+  const [modalDuplicados, setModalDuplicados] = useState(false);
 
   // Cargar lista de carpetas al seleccionar o cambiar de condominio
   useEffect(() => {
@@ -167,7 +172,7 @@ export default function ConciliacionPanel({
       const data = await fetchCarpetas(condoId);
       setCarpetas(data || []);
     } catch (err) {
-      console.error("Error al cargar carpetas de conciliación:", err);
+      console.error("Error al cargar carpetas de conciliaciÃ³n:", err);
     } finally {
       setLoadingCarpetas(false);
     }
@@ -194,7 +199,7 @@ export default function ConciliacionPanel({
 
   const handleEliminarCarpeta = async (e, carpetaId, nombre) => {
     e.stopPropagation();
-    if (!confirm(`¿Deseas eliminar la carpeta "${nombre}" y todas las conciliaciones que contiene? Esta acción no se puede deshacer.`)) return;
+    if (!confirm(`Â¿Deseas eliminar la carpeta "${nombre}" y todas las conciliaciones que contiene? Esta acciÃ³n no se puede deshacer.`)) return;
     try {
       await deleteCarpeta(carpetaId);
       showNotice(`Carpeta "${nombre}" eliminada.`);
@@ -219,12 +224,12 @@ export default function ConciliacionPanel({
     const destId = parseInt(modalFusionar.carpetaDestinoId);
     const destCarpeta = carpetas.find((c) => c.id === destId);
 
-    if (!confirm(`¿Confirmas fusionar la carpeta "${modalFusionar.carpetaOrigen.nombre}" dentro de "${destCarpeta?.nombre || "destino"}"? Se consolidarán sus extractos.`)) return;
+    if (!confirm(`Â¿Confirmas fusionar la carpeta "${modalFusionar.carpetaOrigen.nombre}" dentro de "${destCarpeta?.nombre || "destino"}"? Se consolidarÃ¡n sus extractos.`)) return;
 
     try {
       await fusionarCarpetas(modalFusionar.carpetaOrigen.id, destId);
       setModalFusionar({ open: false, carpetaOrigen: null, carpetaDestinoId: "" });
-      showNotice(`¡Carpetas fusionadas exitosamente en "${destCarpeta?.nombre || "destino"}"!`);
+      showNotice(`Â¡Carpetas fusionadas exitosamente en "${destCarpeta?.nombre || "destino"}"!`);
       loadCarpetas(condominio.id);
     } catch (err) {
       alert("Error al fusionar carpetas: " + err.message);
@@ -247,10 +252,10 @@ export default function ConciliacionPanel({
     try {
       await moverConciliacion(modalMover.item.id, destId);
       setModalMover({ open: false, item: null, nuevaCarpetaId: "" });
-      showNotice("Conciliación transferida a la nueva carpeta.");
+      showNotice("ConciliaciÃ³n transferida a la nueva carpeta.");
       loadCarpetas(condominio.id);
     } catch (err) {
-      alert("Error al mover conciliación: " + err.message);
+      alert("Error al mover conciliaciÃ³n: " + err.message);
     }
   };
 
@@ -283,7 +288,7 @@ export default function ConciliacionPanel({
       setTituloTemp(data.titulo || data.nombre_archivo || "");
       setVista("conciliando");
     } catch (err) {
-      alert("Error al cargar la conciliación: " + err.message);
+      alert("Error al cargar la conciliaciÃ³n: " + err.message);
     } finally {
       setLoading(false);
     }
@@ -295,7 +300,7 @@ export default function ConciliacionPanel({
       await updateEstadoCuentaTitulo(estadoCuenta.estado_cuenta_id, tituloTemp);
       setEstadoCuenta((prev) => ({ ...prev, titulo: tituloTemp }));
       setEditandoTitulo(false);
-      showNotice("Nombre de la conciliación actualizado.");
+      showNotice("Nombre de la conciliaciÃ³n actualizado.");
       loadCarpetas(condominio.id);
     } catch (err) {
       alert("Error al actualizar el nombre: " + err.message);
@@ -308,16 +313,16 @@ export default function ConciliacionPanel({
     }
     setVista("carpetas");
     loadCarpetas(condominio.id);
-    showNotice("Conciliación guardada y pausada. Puedes continuar en cualquier momento.");
+    showNotice("ConciliaciÃ³n guardada y pausada. Puedes continuar en cualquier momento.");
   };
 
   const handleDelete = async (e, id, nombre) => {
     e.stopPropagation();
-    if (!confirm(`¿Deseas eliminar la conciliación "${nombre}"? Esta acción removerá sus registros asociados.`)) return;
+    if (!confirm(`Â¿Deseas eliminar la conciliaciÃ³n "${nombre}"? Esta acciÃ³n removerÃ¡ sus registros asociados.`)) return;
 
     try {
       await deleteEstadoCuenta(id);
-      showNotice("Conciliación eliminada.");
+      showNotice("ConciliaciÃ³n eliminada.");
       loadCarpetas(condominio.id);
       if (estadoCuenta?.estado_cuenta_id === id) {
         setEstadoCuenta(null);
@@ -325,7 +330,7 @@ export default function ConciliacionPanel({
         setVista("carpetas");
       }
     } catch (err) {
-      alert("Error al eliminar conciliación: " + err.message);
+      alert("Error al eliminar conciliaciÃ³n: " + err.message);
     }
   };
 
@@ -353,14 +358,14 @@ export default function ConciliacionPanel({
       );
       setEstadoCuenta(data);
       setMovimientos(data.movimientos || []);
-      setTituloTemp(data.titulo || tituloNuevo || "Nueva Conciliación");
+      setTituloTemp(data.titulo || tituloNuevo || "Nueva ConciliaciÃ³n");
       setTituloNuevo("");
       setVista("conciliando");
 
       if (esHistorico) {
         onRefreshInmuebles();
-        const archTxt = data.total_archivos > 1 ? `${data.total_archivos} archivos históricos procesados` : "Archivo histórico procesado";
-        showNotice(`¡${archTxt}! ${data.total_movimientos} movimientos aprendidos en la memoria asociativa.`);
+        const archTxt = data.total_archivos > 1 ? `${data.total_archivos} archivos histÃ³ricos procesados` : "Archivo histÃ³rico procesado";
+        showNotice(`Â¡${archTxt}! ${data.total_movimientos} movimientos aprendidos en la memoria asociativa.`);
       } else {
         const bancoLabel = data.banco_detectado ? `[${data.banco_detectado}] ` : "";
         const archTxt = data.total_archivos > 1 ? `${data.total_archivos} archivos analizados: ` : "";
@@ -371,8 +376,8 @@ export default function ConciliacionPanel({
       const errMsg = err.message || "";
       if (files && files.length > 0 && (errMsg.includes("No se encontraron transacciones") || errMsg.includes("legibles") || errMsg.includes("400"))) {
         const wantMap = confirm(
-          "El sistema no pudo leer automáticamente las columnas de este extracto (posible variación de formato del banco).\n\n" +
-          "¿Deseas abrir el Mapeador Interactivo de Columnas para asignarlas tú mismo?"
+          "El sistema no pudo leer automÃ¡ticamente las columnas de este extracto (posible variaciÃ³n de formato del banco).\n\n" +
+          "Â¿Deseas abrir el Mapeador Interactivo de Columnas para asignarlas tÃº mismo?"
         );
         if (wantMap) {
           setModalColumnMapper({ open: true, file: files[0] });
@@ -528,7 +533,7 @@ export default function ConciliacionPanel({
 
     if (
       !confirm(
-        `¿Deseas confirmar en lote ${candidates.length} pagos sugeridos con alta certeza (>=70%)?`
+        `Â¿Deseas confirmar en lote ${candidates.length} pagos sugeridos con alta certeza (>=70%)?`
       )
     )
       return;
@@ -569,10 +574,10 @@ export default function ConciliacionPanel({
       );
       onRefreshInmuebles();
       showNotice(
-        `¡Excelente! Se confirmaron ${candidates.length} pagos y se actualizó la memoria del sistema.`
+        `Â¡Excelente! Se confirmaron ${candidates.length} pagos y se actualizÃ³ la memoria del sistema.`
       );
     } catch (err) {
-      alert("Error en confirmación por lote: " + err.message);
+      alert("Error en confirmaciÃ³n por lote: " + err.message);
     }
   };
 
@@ -608,7 +613,7 @@ export default function ConciliacionPanel({
   const formatCurrency = (val) =>
     Number(val || 0).toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-  // Agrupamiento dinámico de conciliaciones por Mes/Año (solo los meses que existen)
+  // Agrupamiento dinÃ¡mico de conciliaciones por Mes/AÃ±o (solo los meses que existen)
   const gruposPorMes = carpetas.reduce((acc, ec) => {
     const key = ec.mes_key || "otros";
     if (!acc[key]) {
@@ -627,7 +632,7 @@ export default function ConciliacionPanel({
     return acc;
   }, {});
 
-  // Ordenar meses cronológicamente descendente
+  // Ordenar meses cronolÃ³gicamente descendente
   const keysMesesOrdenados = Object.keys(gruposPorMes).sort((a, b) => b.localeCompare(a));
 
   return (
@@ -662,7 +667,7 @@ export default function ConciliacionPanel({
               fontSize: "12px",
             }}
           >
-            ✕
+            âœ•
           </button>
         </div>
       )}
@@ -689,7 +694,7 @@ export default function ConciliacionPanel({
               <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                 <FolderArchive size={22} style={{ color: "#111110" }} />
                 <h2 style={{ fontSize: "20px", fontWeight: 600, color: "#111110", margin: 0, letterSpacing: "-0.02em" }}>
-                  Carpetas de Conciliación
+                  Carpetas de ConciliaciÃ³n
                 </h2>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: "12px", marginTop: "4px" }}>
@@ -698,7 +703,7 @@ export default function ConciliacionPanel({
                 </p>
                 {carpetas.length > 0 && (
                   <>
-                    <span style={{ color: "rgba(20,20,19,0.3)" }}>•</span>
+                    <span style={{ color: "rgba(20,20,19,0.3)" }}>â€¢</span>
                     <button
                       onClick={() => {
                         const allCol = carpetas.every((c) => carpetasColapsadas[c.id]);
@@ -729,8 +734,31 @@ export default function ConciliacionPanel({
             <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
               <button
                 type="button"
+                onClick={() => setModalDuplicados(true)}
+                title="Detectar y resolver pagos duplicados entre estados de cuenta"
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  padding: "9px 15px",
+                  borderRadius: "10px",
+                  background: "rgba(234, 179, 8, 0.08)",
+                  color: "var(--color-fg, #0f172a)",
+                  border: "1px solid rgba(234, 179, 8, 0.25)",
+                  fontSize: "13px",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  transition: "all 0.15s ease",
+                }}
+              >
+                <Copy size={15} />
+                <span>Detectar Duplicados</span>
+              </button>
+
+              <button
+                type="button"
                 onClick={() => setModalReporteGeneral(true)}
-                title="Generar reporte contable con filtros de fecha, estado y eliminación de duplicados"
+                title="Generar reporte contable con filtros de fecha, estado y eliminaciÃ³n de duplicados"
                 style={{
                   display: "inline-flex",
                   alignItems: "center",
@@ -795,7 +823,7 @@ export default function ConciliacionPanel({
                 }}
               >
                 <Plus size={16} />
-                <span>Nueva Conciliación</span>
+                <span>Nueva ConciliaciÃ³n</span>
               </button>
             </div>
           </div>
@@ -807,7 +835,7 @@ export default function ConciliacionPanel({
             </div>
           )}
 
-          {/* Estado vacío: Sin conciliaciones previas */}
+          {/* Estado vacÃ­o: Sin conciliaciones previas */}
           {!loadingCarpetas && carpetas.length === 0 && (
             <div
               style={{
@@ -823,7 +851,7 @@ export default function ConciliacionPanel({
                 No hay conciliaciones registradas
               </h3>
               <p style={{ fontSize: "13px", color: "rgba(20, 20, 19, 0.6)", maxWidth: "440px", margin: "0 auto 20px auto" }}>
-                Sube el primer estado de cuenta bancario en PDF o Excel para comenzar el proceso de conciliación asistido por IA.
+                Sube el primer estado de cuenta bancario en PDF o Excel para comenzar el proceso de conciliaciÃ³n asistido por IA.
               </p>
               <button
                 onClick={() => {
@@ -869,7 +897,7 @@ export default function ConciliacionPanel({
                       overflow: "hidden",
                     }}
                   >
-                    {/* Barra de título de la carpeta */}
+                    {/* Barra de tÃ­tulo de la carpeta */}
                     <div
                       onClick={() => toggleCarpeta(carpeta.id)}
                       title={isColapsada ? "Clic para desplegar carpeta" : "Clic para minimizar carpeta"}
@@ -993,7 +1021,7 @@ export default function ConciliacionPanel({
                                   color: "rgba(20, 20, 19, 0.7)",
                                 }}
                               >
-                                {itemsCount} {itemsCount === 1 ? "conciliación" : "conciliaciones"}
+                                {itemsCount} {itemsCount === 1 ? "conciliaciÃ³n" : "conciliaciones"}
                               </span>
                             </div>
                           )}
@@ -1080,12 +1108,12 @@ export default function ConciliacionPanel({
                       </div>
                     </div>
 
-                    {/* Fila / Tarjetas de conciliaciones dentro de la carpeta (si no está minimizada) */}
+                    {/* Fila / Tarjetas de conciliaciones dentro de la carpeta (si no estÃ¡ minimizada) */}
                     {!isColapsada && (
                       <div style={{ display: "flex", flexDirection: "column" }}>
                         {itemsCount === 0 ? (
                           <div style={{ padding: "24px", textAlign: "center", color: "rgba(20,20,19,0.4)", fontSize: "12.5px" }}>
-                            Esta carpeta está vacía. Haz clic en "+ Agregar" para subirle un extracto bancario.
+                            Esta carpeta estÃ¡ vacÃ­a. Haz clic en "+ Agregar" para subirle un extracto bancario.
                           </div>
                         ) : (
                           carpeta.items.map((ec, idx) => {
@@ -1105,7 +1133,7 @@ export default function ConciliacionPanel({
                                   transition: "background 0.15s ease",
                                 }}
                               >
-                                {/* Información de la conciliación */}
+                                {/* InformaciÃ³n de la conciliaciÃ³n */}
                                 <div style={{ flex: "1", minWidth: "260px" }}>
                                   <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                                     <span style={{ fontSize: "14px", fontWeight: 600, color: "#111110" }}>
@@ -1140,9 +1168,9 @@ export default function ConciliacionPanel({
                                     <span>
                                       {ec.confirmados_count} / {ec.total_ingresos_filas || ec.total_movimientos} conciliados ({ec.porcentaje}%)
                                     </span>
-                                    <span>•</span>
+                                    <span>â€¢</span>
                                     <span>Total: <b>Bs. {formatCurrency(ec.total_ingresos)}</b></span>
-                                    <span>•</span>
+                                    <span>â€¢</span>
                                     <span>Subido: {new Date(ec.fecha_subida).toLocaleDateString("es-VE")}</span>
                                   </div>
 
@@ -1169,7 +1197,7 @@ export default function ConciliacionPanel({
                                   </div>
                                 </div>
 
-                                {/* Acciones para esta conciliación */}
+                                {/* Acciones para esta conciliaciÃ³n */}
                                 <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                                   <button
                                     onClick={() => handleOpenConciliacion(ec.id)}
@@ -1188,14 +1216,14 @@ export default function ConciliacionPanel({
                                     }}
                                   >
                                     <Play size={13} fill="#ffffff" />
-                                    <span>{isComplete ? "Ver Conciliación" : "Continuar"}</span>
+                                    <span>{isComplete ? "Ver ConciliaciÃ³n" : "Continuar"}</span>
                                   </button>
 
-                                  {/* Botón Mover a otra carpeta */}
+                                  {/* BotÃ³n Mover a otra carpeta */}
                                   {carpetas.length > 1 && (
                                     <button
                                       onClick={(e) => handleAbrirMover(e, ec)}
-                                      title="Mover esta conciliación a otra carpeta"
+                                      title="Mover esta conciliaciÃ³n a otra carpeta"
                                       style={{
                                         display: "inline-flex",
                                         alignItems: "center",
@@ -1264,7 +1292,7 @@ export default function ConciliacionPanel({
 
                                   <button
                                     onClick={(e) => handleDelete(e, ec.id, ec.titulo_display)}
-                                    title="Eliminar conciliación"
+                                    title="Eliminar conciliaciÃ³n"
                                     style={{
                                       padding: "7px 8px",
                                       borderRadius: "8px",
@@ -1294,7 +1322,7 @@ export default function ConciliacionPanel({
       )}
 
       {/* ============================================================== */}
-      {/* VISTA 2: NUEVA CONCILIACIÓN (SUBIDA DE EXTRACTOS)              */}
+      {/* VISTA 2: NUEVA CONCILIACIÃ“N (SUBIDA DE EXTRACTOS)              */}
       {/* ============================================================== */}
       {vista === "nueva" && (
         <div>
@@ -1369,10 +1397,10 @@ export default function ConciliacionPanel({
             </h3>
             <p style={{ fontSize: "13px", color: "rgba(20, 20, 19, 0.6)", margin: "0 0 24px 0", maxWidth: "520px" }}>
               Soporta extractos del <b>BNC</b>, <b>Banco Exterior</b> y <b>100%Banco</b> en formato PDF o Excel (.xlsx / .csv).
-              Puedes arrastrar múltiples archivos para consolidar un mes completo.
+              Puedes arrastrar mÃºltiples archivos para consolidar un mes completo.
             </p>
 
-            {/* Configuración de subida */}
+            {/* ConfiguraciÃ³n de subida */}
             <div
               style={{
                 display: "flex",
@@ -1405,7 +1433,7 @@ export default function ConciliacionPanel({
                       cursor: "pointer",
                     }}
                   >
-                    ✨ Auto (Unir a mes)
+                    âœ¨ Auto (Unir a mes)
                   </button>
                   <button
                     type="button"
@@ -1422,7 +1450,7 @@ export default function ConciliacionPanel({
                       cursor: "pointer",
                     }}
                   >
-                    📁 Existente
+                    ðŸ“ Existente
                   </button>
                   <button
                     type="button"
@@ -1461,7 +1489,7 @@ export default function ConciliacionPanel({
                     <option value="">Selecciona la carpeta donde guardarlo...</option>
                     {carpetas.map((c) => (
                       <option key={c.id} value={c.id}>
-                        📁 {c.nombre} ({c.items?.length || 0} conciliaciones)
+                        ðŸ“ {c.nombre} ({c.items?.length || 0} conciliaciones)
                       </option>
                     ))}
                   </select>
@@ -1490,11 +1518,11 @@ export default function ConciliacionPanel({
               {/* Nombre personalizado opcional */}
               <div style={{ width: "100%", textAlign: "left" }}>
                 <label style={{ fontSize: "12px", fontWeight: 600, color: "rgba(20, 20, 19, 0.7)", marginBottom: "4px", display: "block" }}>
-                  Nombre / Etiqueta de la Conciliación (Opcional)
+                  Nombre / Etiqueta de la ConciliaciÃ³n (Opcional)
                 </label>
                 <input
                   type="text"
-                  placeholder="Ej: Conciliación Octubre 2026 - Principal"
+                  placeholder="Ej: ConciliaciÃ³n Octubre 2026 - Principal"
                   value={tituloNuevo}
                   onChange={(e) => setTituloNuevo(e.target.value)}
                   style={{
@@ -1511,7 +1539,7 @@ export default function ConciliacionPanel({
                 />
               </div>
 
-              {/* Selector de Banco y Toggle de Modo Histórico */}
+              {/* Selector de Banco y Toggle de Modo HistÃ³rico */}
               <div style={{ display: "flex", gap: "12px", width: "100%", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13px", color: "rgba(20, 20, 19, 0.7)" }}>
                   <span>Banco:</span>
@@ -1539,14 +1567,14 @@ export default function ConciliacionPanel({
                         cursor: "pointer",
                       }}
                     >
-                      <option value="auto">✨ Auto-detectar (Recomendado)</option>
-                      <option value="bnc">BNC (Banco Nacional de Crédito)</option>
+                      <option value="auto">âœ¨ Auto-detectar (Recomendado)</option>
+                      <option value="bnc">BNC (Banco Nacional de CrÃ©dito)</option>
                       <option value="exterior">Banco Exterior</option>
                       <option value="100banco">100%Banco</option>
                       {bancosList.filter(b => b.tipo === "personalizado").map((b) => (
-                        <option key={b.id} value={b.nombre}>🏦 {b.nombre} (Guardado)</option>
+                        <option key={b.id} value={b.nombre}>ðŸ¦ {b.nombre} (Guardado)</option>
                       ))}
-                      <option value="__otro__">➕ Otro banco...</option>
+                      <option value="__otro__">âž• Otro banco...</option>
                     </select>
 
                     {bancosList.some(b => b.tipo === "personalizado" && b.nombre === bancoSeleccionado) && (
@@ -1652,7 +1680,7 @@ export default function ConciliacionPanel({
                     onChange={(e) => setEsHistorico(e.target.checked)}
                     style={{ cursor: "pointer", accentColor: "#111110" }}
                   />
-                  <span>Es archivo histórico (entrenar memoria)</span>
+                  <span>Es archivo histÃ³rico (entrenar memoria)</span>
                 </label>
               </div>
             </div>
@@ -1720,7 +1748,7 @@ export default function ConciliacionPanel({
                 }}
               >
                 <SlidersHorizontal size={14} />
-                <span>¿Formato bancario no reconocido o columnas desordenadas? <b>Mapear interactivamente</b></span>
+                <span>Â¿Formato bancario no reconocido o columnas desordenadas? <b>Mapear interactivamente</b></span>
               </button>
             </div>
           </div>
@@ -1728,7 +1756,7 @@ export default function ConciliacionPanel({
       )}
 
       {/* ============================================================== */}
-      {/* VISTA 3: PROCESO ACTIVO DE CONCILIACIÓN                        */}
+      {/* VISTA 3: PROCESO ACTIVO DE CONCILIACIÃ“N                        */}
       {/* ============================================================== */}
       {vista === "conciliando" && estadoCuenta && (
         <div>
@@ -1745,7 +1773,7 @@ export default function ConciliacionPanel({
               borderBottom: "1px solid rgba(0, 0, 0, 0.08)",
             }}
           >
-            {/* Lado izquierdo: Volver y Título editable */}
+            {/* Lado izquierdo: Volver y TÃ­tulo editable */}
             <div style={{ display: "flex", alignItems: "center", gap: "14px", flex: "1", minWidth: "300px" }}>
               <button
                 onClick={handlePausarYGuardar}
@@ -1767,7 +1795,7 @@ export default function ConciliacionPanel({
                 <span>Carpetas</span>
               </button>
 
-              {/* Título editable */}
+              {/* TÃ­tulo editable */}
               <div style={{ display: "flex", alignItems: "center", gap: "8px", flex: "1" }}>
                 {editandoTitulo ? (
                   <div style={{ display: "flex", alignItems: "center", gap: "6px", width: "100%", maxWidth: "420px" }}>
@@ -1809,11 +1837,11 @@ export default function ConciliacionPanel({
                 ) : (
                   <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                     <h2 style={{ fontSize: "18px", fontWeight: 600, color: "#111110", margin: 0, letterSpacing: "-0.01em" }}>
-                      {estadoCuenta.titulo || estadoCuenta.nombre_archivo || "Conciliación Bancaria"}
+                      {estadoCuenta.titulo || estadoCuenta.nombre_archivo || "ConciliaciÃ³n Bancaria"}
                     </h2>
                     <button
                       onClick={() => setEditandoTitulo(true)}
-                      title="Cambiar nombre de la conciliación"
+                      title="Cambiar nombre de la conciliaciÃ³n"
                       style={{
                         background: "transparent",
                         border: "none",
@@ -1835,7 +1863,7 @@ export default function ConciliacionPanel({
             <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
               <button
                 onClick={handlePausarYGuardar}
-                title="Guarda el estado actual de la conciliación para continuar después"
+                title="Guarda el estado actual de la conciliaciÃ³n para continuar despuÃ©s"
                 style={{
                   display: "inline-flex",
                   alignItems: "center",
@@ -1881,7 +1909,7 @@ export default function ConciliacionPanel({
               <a
                 href={getExportExcelUrl(estadoCuenta.estado_cuenta_id)}
                 download
-                title="Exportar archivo Excel limpio para impresión"
+                title="Exportar archivo Excel limpio para impresiÃ³n"
                 style={{
                   display: "inline-flex",
                   alignItems: "center",
@@ -1903,7 +1931,7 @@ export default function ConciliacionPanel({
             </div>
           </div>
 
-          {/* Tarjetas de Métricas de la Conciliación */}
+          {/* Tarjetas de MÃ©tricas de la ConciliaciÃ³n */}
           <div
             style={{
               display: "grid",
@@ -1953,7 +1981,7 @@ export default function ConciliacionPanel({
               }}
             >
               <div style={{ fontSize: "12px", color: "rgba(20, 20, 19, 0.5)", fontWeight: 500 }}>
-                Progreso de Conciliación
+                Progreso de ConciliaciÃ³n
               </div>
               <div style={{ fontSize: "22px", fontWeight: 700, color: pctConciliado === 100 ? "#059669" : "#111110", marginTop: "4px" }}>
                 {totalConfirmados} / {totalIngresos}{" "}
@@ -1980,7 +2008,7 @@ export default function ConciliacionPanel({
             </div>
           </div>
 
-          {/* Barra de Filtros, Búsqueda y Aprobación en Lote */}
+          {/* Barra de Filtros, BÃºsqueda y AprobaciÃ³n en Lote */}
           <div
             style={{
               display: "flex",
@@ -1991,10 +2019,10 @@ export default function ConciliacionPanel({
               marginBottom: "20px",
             }}
           >
-            {/* Píldoras de Filtro */}
+            {/* PÃ­ldoras de Filtro */}
             <div style={{ display: "flex", gap: "6px", alignItems: "center", flexWrap: "wrap" }}>
               {[
-                { id: "ingresos", label: "Solo Créditos (Haber > 0)" },
+                { id: "ingresos", label: "Solo CrÃ©ditos (Haber > 0)" },
                 { id: "pendientes", label: "Pendientes" },
                 { id: "confirmados", label: "Confirmados" },
                 { id: "todos", label: "Todos los movimientos" },
@@ -2036,7 +2064,7 @@ export default function ConciliacionPanel({
                 />
                 <input
                   type="text"
-                  placeholder="Buscar descripción, ref, inmueble…"
+                  placeholder="Buscar descripciÃ³n, ref, inmuebleâ€¦"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   style={{
@@ -2057,7 +2085,7 @@ export default function ConciliacionPanel({
               </div>
             </div>
 
-            {/* Aprobación en Lote */}
+            {/* AprobaciÃ³n en Lote */}
             {highConfidencePending > 0 && (
               <button
                 type="button"
@@ -2095,7 +2123,7 @@ export default function ConciliacionPanel({
               <thead>
                 <tr style={{ background: "rgba(0, 0, 0, 0.02)", borderBottom: "1px solid rgba(0, 0, 0, 0.08)" }}>
                   <th style={{ padding: "12px 16px", fontWeight: 600, color: "#111110", width: "95px" }}>Fecha</th>
-                  <th style={{ padding: "12px 16px", fontWeight: 600, color: "#111110" }}>Descripción / Emisor</th>
+                  <th style={{ padding: "12px 16px", fontWeight: 600, color: "#111110" }}>DescripciÃ³n / Emisor</th>
                   <th style={{ padding: "12px 16px", fontWeight: 600, color: "#111110", width: "120px" }}>Referencia</th>
                   <th style={{ padding: "12px 16px", fontWeight: 600, color: "#111110", width: "120px", textAlign: "right" }}>
                     Monto (Haber)
@@ -2135,7 +2163,7 @@ export default function ConciliacionPanel({
                       ? "no_aplica"
                       : m.inmueble_confirmado_id || m.inmueble_sugerido_id || "";
 
-                    // Colores según estado y tipo de asignación (Gris para No Aplica, Ámbar para No Identificado, Verde para Inmuebles)
+                    // Colores segÃºn estado y tipo de asignaciÃ³n (Gris para No Aplica, Ãmbar para No Identificado, Verde para Inmuebles)
                     let rowBg = "transparent";
                     let rowHoverBg = "rgba(0, 0, 0, 0.02)";
                     let rowBorderBottom = "1px solid rgba(0, 0, 0, 0.04)";
@@ -2150,7 +2178,7 @@ export default function ConciliacionPanel({
                         rowBorderLeft = "4px solid #64748b"; // slate-500
                         dateColor = "#475569";
                       } else if (isNoIdentificado) {
-                        rowBg = "#fffbeb"; // Ámbar suave (amber-50)
+                        rowBg = "#fffbeb"; // Ãmbar suave (amber-50)
                         rowHoverBg = "#fef3c7"; // amber-100
                         rowBorderBottom = "1px solid rgba(245, 158, 11, 0.35)";
                         rowBorderLeft = "4px solid #f59e0b"; // amber-500
@@ -2192,7 +2220,7 @@ export default function ConciliacionPanel({
                           {m.fecha}
                         </td>
 
-                        {/* Descripción y metadatos */}
+                        {/* DescripciÃ³n y metadatos */}
                         <td style={{ padding: "12px 16px", maxWidth: "340px" }}>
                           <div style={{ fontWeight: 500, color: "#111110", wordBreak: "break-word" }}>
                             {m.descripcion}
@@ -2229,7 +2257,7 @@ export default function ConciliacionPanel({
 
                         {/* Referencia */}
                         <td style={{ padding: "12px 16px", fontFamily: "var(--font-mono)", color: "rgba(20, 20, 19, 0.7)" }}>
-                          {m.referencia || "—"}
+                          {m.referencia || "â€”"}
                         </td>
 
                         {/* Monto */}
@@ -2345,8 +2373,8 @@ export default function ConciliacionPanel({
                             }}
                           >
                             <option value="">Seleccionar...</option>
-                            <option value="no_aplica">🚫 No Aplica (Interés / Operacional)</option>
-                            <option value="no_identificado">❓ No Identificado (Por Verificar)</option>
+                            <option value="no_aplica">ðŸš« No Aplica (InterÃ©s / Operacional)</option>
+                            <option value="no_identificado">â“ No Identificado (Por Verificar)</option>
                             {inmuebles.map((inm) => (
                               <option key={inm.id} value={inm.id}>
                                 {inm.identificador} - {inm.propietario}
@@ -2355,7 +2383,7 @@ export default function ConciliacionPanel({
                           </select>
                         </td>
 
-                        {/* Clasificación Especial (Ej: Caney) */}
+                        {/* ClasificaciÃ³n Especial (Ej: Caney) */}
                         <td style={{ padding: "12px 16px" }}>
                           <select
                             value={m.clasificacion_especial === "No Identificado" || m.clasificacion_especial === "No Aplica" ? "" : (m.clasificacion_especial || "")}
@@ -2387,14 +2415,14 @@ export default function ConciliacionPanel({
                             }}
                           >
                             <option value="">Ordinario</option>
-                            <option value="Caney">Caney / Área Social</option>
-                            <option value="Salón de Fiesta">Salón de Fiesta</option>
-                            <option value="Multa">Multa / Interés</option>
+                            <option value="Caney">Caney / Ãrea Social</option>
+                            <option value="SalÃ³n de Fiesta">SalÃ³n de Fiesta</option>
+                            <option value="Multa">Multa / InterÃ©s</option>
                             <option value="Gasto Operacional">Gasto Operacional</option>
                           </select>
                         </td>
 
-                        {/* Estado / Acción rápida */}
+                        {/* Estado / AcciÃ³n rÃ¡pida */}
                         <td style={{ padding: "12px 16px", textAlign: "center" }}>
                           {isConfirmed ? (
                             isNoAplica ? (
@@ -2513,12 +2541,12 @@ export default function ConciliacionPanel({
             </div>
 
             <p style={{ fontSize: "13px", color: "rgba(20, 20, 19, 0.7)", lineHeight: "1.5", margin: "0 0 16px 0" }}>
-              Se moverán todas las conciliaciones de <b>"{modalFusionar.carpetaOrigen.nombre}"</b> dentro de la carpeta destino seleccionada, y la carpeta origen se eliminará.
+              Se moverÃ¡n todas las conciliaciones de <b>"{modalFusionar.carpetaOrigen.nombre}"</b> dentro de la carpeta destino seleccionada, y la carpeta origen se eliminarÃ¡.
             </p>
 
             <div style={{ marginBottom: "20px" }}>
               <label style={{ fontSize: "12px", fontWeight: 600, color: "rgba(20, 20, 19, 0.7)", marginBottom: "6px", display: "block" }}>
-                Carpeta Destino (donde se unificarán)
+                Carpeta Destino (donde se unificarÃ¡n)
               </label>
               <select
                 value={modalFusionar.carpetaDestinoId}
@@ -2538,7 +2566,7 @@ export default function ConciliacionPanel({
                   .filter((c) => c.id !== modalFusionar.carpetaOrigen.id)
                   .map((c) => (
                     <option key={c.id} value={c.id}>
-                      📁 {c.nombre} ({c.items?.length || 0} conciliaciones)
+                      ðŸ“ {c.nombre} ({c.items?.length || 0} conciliaciones)
                     </option>
                   ))}
               </select>
@@ -2576,7 +2604,7 @@ export default function ConciliacionPanel({
                   cursor: "pointer",
                 }}
               >
-                Confirmar Fusión
+                Confirmar FusiÃ³n
               </button>
             </div>
           </div>
@@ -2584,7 +2612,7 @@ export default function ConciliacionPanel({
       )}
 
       {/* ============================================================== */}
-      {/* MODAL 2: MOVER CONCILIACIÓN A OTRA CARPETA                     */}
+      {/* MODAL 2: MOVER CONCILIACIÃ“N A OTRA CARPETA                     */}
       {/* ============================================================== */}
       {modalMover.open && modalMover.item && (
         <div
@@ -2646,7 +2674,7 @@ export default function ConciliacionPanel({
                   .filter((c) => c.id !== modalMover.item.carpeta_id)
                   .map((c) => (
                     <option key={c.id} value={c.id}>
-                      📁 {c.nombre} ({c.items?.length || 0} conciliaciones)
+                      ðŸ“ {c.nombre} ({c.items?.length || 0} conciliaciones)
                     </option>
                   ))}
               </select>
@@ -2734,7 +2762,7 @@ export default function ConciliacionPanel({
               </label>
               <input
                 type="text"
-                placeholder="Ej: Noviembre 2026, Auditoría Especial..."
+                placeholder="Ej: Noviembre 2026, AuditorÃ­a Especial..."
                 value={nombreNuevaCarpeta}
                 onChange={(e) => setNombreNuevaCarpeta(e.target.value)}
                 onKeyDown={(e) => {
@@ -2808,11 +2836,11 @@ export default function ConciliacionPanel({
         onSuccess={(data) => {
           setEstadoCuenta(data);
           setMovimientos(data.movimientos || []);
-          setTituloTemp(data.titulo || tituloNuevo || "Nueva Conciliación");
+          setTituloTemp(data.titulo || tituloNuevo || "Nueva ConciliaciÃ³n");
           setTituloNuevo("");
           setVista("conciliando");
           loadCarpetas(condominio.id);
-          showNotice(`¡Extracto importado con mapeo interactivo! ${data.total_movimientos} movimientos cargados.`);
+          showNotice(`Â¡Extracto importado con mapeo interactivo! ${data.total_movimientos} movimientos cargados.`);
         }}
       />
 
@@ -2823,6 +2851,22 @@ export default function ConciliacionPanel({
         condominio={condominio}
         carpetas={carpetas}
       />
+
+      {/* MODAL 6: DETECCION Y RESOLUCION DE DUPLICADOS CROSS-UPLOAD */}
+      {modalDuplicados && (
+        <DuplicadosModal
+          condominio={condominio}
+          onClose={() => setModalDuplicados(false)}
+          onResolved={(res) => {
+            setModalDuplicados(false);
+            if (res.eliminados > 0 && estadoCuenta) {
+              // Recargar movimientos si hay una conciliacion abierta
+              handleOpenConciliacion(estadoCuenta.id);
+            }
+          }}
+        />
+      )}
     </div>
   );
 }
+

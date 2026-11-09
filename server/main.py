@@ -136,6 +136,130 @@ def delete_banco(nombre: str):
 
 
 # -------------------------------------------------------------
+# DUPLICADOS CROSS-UPLOAD
+# -------------------------------------------------------------
+
+@app.get("/api/condominios/{condominio_id}/movimientos/duplicados")
+def detectar_duplicados(condominio_id: int):
+    """
+    Detecta pagos duplicados cross-upload para un condominio.
+    Un duplicado: misma referencia normalizada + mismo monto (haber),
+    con tolerancia de +-2 dias en fecha (barrido bancario).
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT m.id, m.referencia, m.haber, m.fecha, m.descripcion,
+               m.estado_conciliacion, m.estado_cuenta_id,
+               m.inmueble_confirmado_id,
+               ec.titulo as estado_cuenta_titulo,
+               ec.banco as banco
+        FROM movimientos m
+        JOIN estados_cuenta ec ON m.estado_cuenta_id = ec.id
+        WHERE m.condominio_id = ?
+          AND m.haber > 0
+          AND m.referencia IS NOT NULL
+          AND TRIM(m.referencia) != ''
+          AND TRIM(m.referencia) != '0'
+        ORDER BY m.referencia, m.haber, m.fecha
+    """, (condominio_id,))
+
+    rows = [dict(r) for r in cursor.fetchall()]
+    conn.close()
+
+    from server.parser_router import normalize_ref
+    from datetime import datetime
+
+    grupos_dict = {}
+    for row in rows:
+        ref_norm = normalize_ref(row["referencia"])
+        haber = round(float(row["haber"] or 0), 2)
+        key = (ref_norm, haber)
+        if key not in grupos_dict:
+            grupos_dict[key] = []
+        grupos_dict[key].append(row)
+
+    grupos_duplicados = []
+    for (ref_norm, haber), movs in grupos_dict.items():
+        if len(movs) < 2:
+            continue
+
+        hay_par_cercano = False
+        for i in range(len(movs)):
+            for j in range(i + 1, len(movs)):
+                try:
+                    f1 = datetime.strptime(str(movs[i]["fecha"] or "")[:10], "%Y-%m-%d")
+                    f2 = datetime.strptime(str(movs[j]["fecha"] or "")[:10], "%Y-%m-%d")
+                    if abs((f1 - f2).days) <= 2:
+                        hay_par_cercano = True
+                        break
+                except Exception:
+                    hay_par_cercano = True
+                    break
+            if hay_par_cercano:
+                break
+
+        if hay_par_cercano:
+            sugerido_mantener = None
+            confirmados = [m for m in movs if m["estado_conciliacion"] == "confirmado"]
+            if len(confirmados) == 1:
+                sugerido_mantener = confirmados[0]["id"]
+            elif len(confirmados) == 0:
+                try:
+                    sorted_movs = sorted(movs, key=lambda m: str(m["fecha"] or ""))
+                    sugerido_mantener = sorted_movs[0]["id"]
+                except Exception:
+                    sugerido_mantener = movs[0]["id"]
+
+            grupos_duplicados.append({
+                "referencia": ref_norm,
+                "haber": haber,
+                "movimientos": movs,
+                "sugerido_mantener_id": sugerido_mantener,
+            })
+
+    return {
+        "condominio_id": condominio_id,
+        "total_grupos": len(grupos_duplicados),
+        "grupos": grupos_duplicados,
+    }
+
+
+from pydantic import BaseModel as _BaseModel
+
+class ResolverDuplicadosPayload(_BaseModel):
+    grupos: list
+
+
+@app.post("/api/condominios/{condominio_id}/movimientos/resolver-duplicados")
+def resolver_duplicados(condominio_id: int, payload: ResolverDuplicadosPayload):
+    """
+    Elimina los movimientos duplicados elegidos por el usuario.
+    Por cada grupo: elimina los ids en 'eliminar_ids'.
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    total_eliminados = 0
+    for grupo in payload.grupos:
+        eliminar_ids = grupo.get("eliminar_ids", [])
+        if not eliminar_ids:
+            continue
+        placeholders = ",".join("?" * len(eliminar_ids))
+        cursor.execute(
+            f"DELETE FROM movimientos WHERE id IN ({placeholders}) AND condominio_id = ?",
+            (*eliminar_ids, condominio_id)
+        )
+        total_eliminados += cursor.rowcount
+
+    conn.commit()
+    conn.close()
+    return {"ok": True, "eliminados": total_eliminados}
+
+
+
+# -------------------------------------------------------------
 # CONDOMINIOS
 # -------------------------------------------------------------
 

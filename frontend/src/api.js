@@ -419,3 +419,29 @@ export async function deleteBanco(nombre) {
   if (!res.ok) throw new Error("Error eliminando banco");
   return res.json();
 }
+
+// ---------------------------------------------------------------------------
+// DUPLICADOS CROSS-UPLOAD
+// ---------------------------------------------------------------------------
+
+export async function fetchDuplicados(condominioId) {
+  const res = await fetch(`${API_BASE}/condominios/${condominioId}/movimientos/duplicados`);
+  if (!res.ok) throw new Error("Error detectando duplicados");
+  return res.json();
+}
+
+export async function resolverDuplicados(condominioId, payload) {
+  const res = await fetch(
+    `${API_BASE}/condominios/${condominioId}/movimientos/resolver-duplicados`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }
+  );
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Error resolviendo duplicados");
+  }
+  return res.json();
+}
