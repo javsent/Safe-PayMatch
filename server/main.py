@@ -69,7 +69,7 @@ def api_check_update():
     return check_for_updates()
 
 @app.post("/api/system/download-update")
-def api_download_update(payload: DownloadUpdateRequest, BancoCreate):
+def api_download_update(payload: DownloadUpdateRequest):
     return start_download_update(payload.url, payload.version)
 
 @app.get("/api/system/download-status")
@@ -1266,6 +1266,11 @@ def confirmar_movimiento(data: ConfirmacionMovimiento):
     mov_dict = dict(mov)
     estado_cuenta_id = mov_dict["estado_cuenta_id"]
 
+    # Si se asocia a un inmueble, no puede ser 'No Identificado' ni 'No Aplica'
+    clean_clasif = data.clasificacion_especial or ""
+    if data.inmueble_id and clean_clasif in ("No Identificado", "no_identificado", "No Aplica", "no_aplica"):
+        clean_clasif = ""
+
     cursor.execute("""
         UPDATE movimientos
         SET inmueble_confirmado_id = ?,
@@ -1274,7 +1279,7 @@ def confirmar_movimiento(data: ConfirmacionMovimiento):
         WHERE id = ?
     """, (
         data.inmueble_id,
-        data.clasificacion_especial or "",
+        clean_clasif,
         data.estado_conciliacion or "confirmado",
         data.movimiento_id
     ))
@@ -1308,13 +1313,16 @@ def confirmar_lote(lote: ConfirmacionLote):
         if mov:
             mov_dict = dict(mov)
             estados_afectados.add(mov_dict["estado_cuenta_id"])
+            clean_clasif = item.clasificacion_especial or ""
+            if item.inmueble_id and clean_clasif in ("No Identificado", "no_identificado", "No Aplica", "no_aplica"):
+                clean_clasif = ""
             cursor.execute("""
                 UPDATE movimientos
                 SET inmueble_confirmado_id = ?,
                     clasificacion_especial = ?,
                     estado_conciliacion = 'confirmado'
                 WHERE id = ?
-            """, (item.inmueble_id, item.clasificacion_especial or "", item.movimiento_id))
+            """, (item.inmueble_id, clean_clasif, item.movimiento_id))
             if item.inmueble_id:
                 learn_from_confirmation(item.inmueble_id, mov_dict, conn=conn)
 
@@ -1457,14 +1465,26 @@ def get_reporte_movimientos(
 
     if estado and estado != "todos":
         if estado == "confirmado":
-            query += " AND m.estado_conciliacion = 'confirmado'"
-        elif estado == "pendiente":
-            query += " AND (m.estado_conciliacion = 'pendiente' OR m.estado_conciliacion IS NULL)"
+            # Solo pagos verdaderamente identificados / asociados a inmueble o categoría válida
+            query += """
+                AND m.estado_conciliacion = 'confirmado'
+                AND (m.clasificacion_especial IS NULL OR m.clasificacion_especial NOT IN ('No Identificado', 'no_identificado'))
+                AND (m.inmueble_confirmado_id IS NOT NULL OR (m.clasificacion_especial IS NOT NULL AND m.clasificacion_especial != ''))
+            """
+        elif estado in ("pendiente", "no_identificado"):
+            # Pagos no identificados: marcados como No Identificado o pendientes sin inmueble confirmado
+            query += """
+                AND (
+                    m.clasificacion_especial IN ('No Identificado', 'no_identificado')
+                    OR m.estado_conciliacion = 'pendiente'
+                    OR m.estado_conciliacion IS NULL
+                    OR (m.inmueble_confirmado_id IS NULL AND (m.clasificacion_especial IS NULL OR m.clasificacion_especial = ''))
+                )
+                AND (m.estado_conciliacion != 'descartado' OR m.estado_conciliacion IS NULL)
+                AND m.inmueble_confirmado_id IS NULL
+            """
         elif estado == "descartado":
-            query += " AND m.estado_conciliacion = 'descartado'"
-        elif estado == "no_identificado":
-            query += " AND (m.estado_conciliacion = 'pendiente' OR m.clasificacion_especial = 'No Identificado')"
-
+            query += " AND m.estado_conciliacion = 'descartado'\n"
     if busqueda and busqueda.strip():
         term = f"%{busqueda.strip()}%"
         query += " AND (m.referencia LIKE ? OR m.descripcion LIKE ? OR i_conf.identificador LIKE ? OR i_sug.identificador LIKE ?)"
@@ -1504,19 +1524,27 @@ def get_reporte_movimientos(
         debe = float(r["debe"] or 0.0)
         monto = haber if haber > 0 else -debe
 
-        if r["estado_conciliacion"] == "confirmado":
-            if r["inmueble_confirmado"]:
-                inm_label = r["inmueble_confirmado"]
-                if r["clasificacion_especial"] and r["clasificacion_especial"] not in ("No Aplica", "No Identificado"):
-                    inm_label += f" ({r['clasificacion_especial']})"
-            elif r["clasificacion_especial"] == "No Identificado":
-                inm_label = "No Identificado"
-            else:
-                inm_label = "No Aplica"
-        else:
-            inm_label = r["inmueble_sugerido"] or "Sin Asignar"
-            if r["clasificacion_especial"]:
+        is_identificado = bool(
+            r["inmueble_confirmado"] or
+            (r["estado_conciliacion"] == "confirmado" and r["clasificacion_especial"] not in ("No Identificado", "no_identificado", ""))
+        )
+        is_descartado = (r["estado_conciliacion"] == "descartado")
+
+        if r["inmueble_confirmado"]:
+            inm_label = r["inmueble_confirmado"]
+            if r["clasificacion_especial"] and r["clasificacion_especial"] not in ("No Aplica", "no_aplica", "No Identificado", "no_identificado"):
                 inm_label += f" ({r['clasificacion_especial']})"
+        elif r["clasificacion_especial"] in ("No Identificado", "no_identificado"):
+            inm_label = "No Identificado"
+        elif r["estado_conciliacion"] == "confirmado":
+            inm_label = r["clasificacion_especial"] or "No Aplica"
+        elif is_descartado:
+            inm_label = "Descartado"
+        else:
+            if r["inmueble_sugerido"]:
+                inm_label = f"Pendiente ({r['inmueble_sugerido']})"
+            else:
+                inm_label = "No Identificado"
 
         desc_limpia = re.sub(r"\s+", " ", r["descripcion"] or "").strip()
         if not desc_limpia:
@@ -1531,7 +1559,9 @@ def get_reporte_movimientos(
             "inmueble": inm_label,
             "estado_conciliacion": r["estado_conciliacion"] or "pendiente",
             "carpeta_nombre": r["carpeta_nombre"] or "Sin Carpeta",
-            "clasificacion_especial": r["clasificacion_especial"] or ""
+            "clasificacion_especial": r["clasificacion_especial"] or "",
+            "es_identificado": is_identificado,
+            "es_descartado": is_descartado
         })
         total_monto += monto
 
@@ -1544,7 +1574,7 @@ def get_reporte_movimientos(
 @app.post("/api/condominios/{condominio_id}/exportar-reporte-personalizado")
 def exportar_reporte_personalizado(
     condominio_id: int,
-    payload: ReportePersonalizadoExport, DownloadUpdateRequest, BancoCreate
+    payload: ReportePersonalizadoExport
 ):
     """
     Genera y descarga el archivo Excel o PDF con las transacciones previsualizadas

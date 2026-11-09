@@ -39,15 +39,6 @@
 > **Fuente de verdad única:** `server/version.py` (`__version__`).
 > Todos los empaquetadores (`packaging/build_desktop.py`, `packaging/installer.iss`) y el endpoint `/api/system/version` se sincronizan con este valor.
 
-### 🏦 Soporte para Bancos Personalizados ("Otro banco...") (COMPLETADO)
-- **Opción "➕ Otro banco...":** En el selector de banco al subir extractos contables.
-- **Entrada interactiva:** Input inline para escribir el nombre del banco (ej. Banesco, Banco de Venezuela, Mercantil, Bancamiga).
-- **Persistencia en SQLite:** Los nombres de bancos agregados por el usuario se guardan en la tabla `bancos_personalizados` y persisten permanentemente.
-- **Acceso rápido y gestión:** Los bancos guardados aparecen directamente en el selector con el prefijo `🏦 [Nombre] (Guardado)` e incluyen un botón 🗑️ para eliminarlos de la lista.
-- **Compatibilidad con parsers y mapeo:** Se integra automáticamente con el parser genérico y con el modal interactivo de mapeo de columnas para preservar el nombre del banco en la conciliación.
-
----
-
 ## Convenciones del proyecto
 
 - **Backend:** Python 3.14 + FastAPI + SQLite (uvicorn)

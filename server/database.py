@@ -197,6 +197,15 @@ def init_db():
     );
     ''')
 
+    # Limpieza defensiva de inconsistencia: movimientos con inmueble asignado
+    # que conservaron clasificación residual 'No Identificado' o 'no_identificado'
+    cursor.execute('''
+        UPDATE movimientos
+        SET clasificacion_especial = ''
+        WHERE inmueble_confirmado_id IS NOT NULL
+          AND clasificacion_especial IN ('No Identificado', 'no_identificado')
+    ''')
+
     conn.commit()
     conn.close()
 

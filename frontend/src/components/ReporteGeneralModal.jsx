@@ -59,7 +59,7 @@ export default function ReporteGeneralModal({
 
   // Actualizar título por defecto según el filtro seleccionado
   useEffect(() => {
-    if (filtroEstado === "pendiente" || filtroEstado === "no_identificado") {
+    if (filtroEstado === "no_identificado" || filtroEstado === "pendiente") {
       setTituloReporte("Reporte de Pagos No Identificados / Pendientes");
     } else if (filtroEstado === "confirmado") {
       setTituloReporte("Reporte de Recaudación Conciliada");
@@ -169,8 +169,8 @@ export default function ReporteGeneralModal({
       if (filtroEstado !== "todos") {
         const estadoLabels = {
           confirmado: "Solo Identificados",
-          pendiente: "Solo Pendientes",
-          no_identificado: "No Identificados",
+          pendiente: "No Identificados / Pendientes",
+          no_identificado: "No Identificados / Pendientes",
           descartado: "Solo Descartados",
         };
         subFiltro += (subFiltro ? " • " : "") + `Filtro: ${estadoLabels[filtroEstado] || filtroEstado}`;
@@ -393,8 +393,7 @@ export default function ReporteGeneralModal({
               >
                 <option value="todos">Todos los Movimientos</option>
                 <option value="confirmado">✓ Solo Identificados / Confirmados</option>
-                <option value="pendiente">⚠️ Solo No Identificados / Pendientes</option>
-                <option value="no_identificado">🔍 Clasificados como "No Identificado"</option>
+                <option value="no_identificado">⚠️ Solo No Identificados / Pendientes</option>
                 <option value="descartado">✕ Solo Descartados</option>
               </select>
             </div>
@@ -649,12 +648,16 @@ export default function ReporteGeneralModal({
                               fontSize: "11px",
                               fontWeight: 600,
                               background:
-                                m.estado_conciliacion === "confirmado"
+                                (m.es_identificado ?? (m.estado_conciliacion === "confirmado" && m.inmueble !== "No Identificado" && !m.inmueble.startsWith("Pendiente")))
                                   ? "rgba(16, 185, 129, 0.12)"
+                                  : (m.es_descartado ?? m.estado_conciliacion === "descartado")
+                                  ? "rgba(239, 68, 68, 0.12)"
                                   : "rgba(245, 158, 11, 0.12)",
                               color:
-                                m.estado_conciliacion === "confirmado"
+                                (m.es_identificado ?? (m.estado_conciliacion === "confirmado" && m.inmueble !== "No Identificado" && !m.inmueble.startsWith("Pendiente")))
                                   ? "#059669"
+                                  : (m.es_descartado ?? m.estado_conciliacion === "descartado")
+                                  ? "#dc2626"
                                   : "#d97706",
                             }}
                           >

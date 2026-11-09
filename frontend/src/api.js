@@ -338,7 +338,13 @@ export async function exportarReportePersonalizado(condominioId, payload) {
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err.detail || "Error al exportar reporte personalizado");
+    let msg = "Error al exportar reporte personalizado";
+    if (typeof err.detail === "string") {
+      msg = err.detail;
+    } else if (Array.isArray(err.detail)) {
+      msg = err.detail.map((d) => d.msg || JSON.stringify(d)).join(", ");
+    }
+    throw new Error(msg);
   }
 
   // Descargar blob
