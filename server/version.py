@@ -8,7 +8,7 @@ Reglas de versionado:
 - PATCH: Corrección de errores, parches y mejoras menores de UI.
 """
 
-__version__ = "1.2.1"
+__version__ = "1.3.0"
 __app_name__ = "Safe-PayMatch"
 __build_date__ = "2026-11-09"
 __channel__ = "stable"

@@ -12,6 +12,9 @@ class CondominioResponse(BaseModel):
     descripcion: str
     icono: str
     created_at: str
+    total_inmuebles: Optional[int] = 0
+    ultima_conciliacion: Optional[str] = None
+    total_conciliaciones: Optional[int] = 0
 
 class InmuebleCreate(BaseModel):
     identificador: str

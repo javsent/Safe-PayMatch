@@ -2,6 +2,14 @@
 
 ## ✅ FUNCIONALIDADES IMPLEMENTADAS RECIENTEMENTE
 
+### 🕒 Indicador de Última Conciliación y Orden por Prioridad (COMPLETADO)
+- **Fecha de última conciliación en tarjeta:** Cada condominio en el panel de selección muestra a un costado la fecha y hora relativa de su último extracto bancario procesado (ej. *Hoy (1:18 p. m.)*, *Hace 4 días*, o en ámbar *Sin conciliar aún*).
+- **Selector inteligente de ordenamiento:** Barra de herramientas superior que permite alternar entre:
+  - **Prioridad:** Coloca al tope los condominios que nunca han sido conciliados o llevan más tiempo sin procesar extractos para priorizar la carga de trabajo.
+  - **A - Z:** Orden alfabético tradicional.
+  - **Recientes:** Los condominios trabajados más recientemente primero.
+- **Consultas optimizadas:** Cálculo en subquery SQL directo en `GET /api/condominios` para máxima velocidad sin N+1 queries.
+
 ### 🗂️ Mapeo Interactivo de Columnas al Importar Estado de Cuenta (COMPLETADO)
 - **Preview de tabla cruda:** Extrae hasta 12 filas de muestra con PDF (`pdfplumber`), Excel (`openpyxl`) y CSV.
 - **Detección inteligente:** Sugiere roles iniciales (`fecha`, `referencia`, `descripcion`, `haber`, `debe`, `ignorar`).

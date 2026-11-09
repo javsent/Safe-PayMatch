@@ -1,5 +1,45 @@
-import React, { useState } from "react";
-import { Building, Plus, Trash2, ArrowRight, ShieldCheck, AlertCircle, Settings, HelpCircle } from "lucide-react";
+import React, { useState, useMemo } from "react";
+import { Building, Plus, Trash2, ArrowRight, ShieldCheck, AlertCircle, Settings, HelpCircle, Clock, ArrowUpDown } from "lucide-react";
+
+function formatFechaRelativa(dateStr) {
+  if (!dateStr) return "Sin conciliar aún";
+  try {
+    const cleanStr = dateStr.includes("T") ? dateStr : dateStr.replace(" ", "T");
+    const d = new Date(cleanStr);
+    if (isNaN(d.getTime())) return dateStr;
+
+    const ahora = new Date();
+    const diffMs = ahora.getTime() - d.getTime();
+    const diffDias = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+    const esMismoDia =
+      d.getDate() === ahora.getDate() &&
+      d.getMonth() === ahora.getMonth() &&
+      d.getFullYear() === ahora.getFullYear();
+
+    if (esMismoDia || diffDias === 0) {
+      const horaStr = d.toLocaleTimeString("es-VE", {
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: true,
+      });
+      return `Hoy (${horaStr})`;
+    }
+
+    if (diffDias === 1) {
+      return "Ayer";
+    }
+
+    if (diffDias > 1 && diffDias < 7) {
+      return `Hace ${diffDias} días`;
+    }
+
+    const pad = (n) => String(n).padStart(2, "0");
+    return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
+  } catch {
+    return dateStr;
+  }
+}
 
 export default function CondominioSelector({
   condominios,
@@ -15,6 +55,37 @@ export default function CondominioSelector({
   const [descripcion, setDescripcion] = useState("");
   const [deleteConfirmId, setDeleteConfirmId] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [orden, setOrden] = useState("prioridad"); // 'prioridad' | 'alfabetico' | 'reciente'
+
+  const condominiosOrdenados = useMemo(() => {
+    const lista = [...(condominios || [])];
+    if (orden === "alfabetico") {
+      return lista.sort((a, b) => a.nombre.localeCompare(b.nombre));
+    }
+    if (orden === "prioridad") {
+      // Prioridad: los que no tienen conciliaciones o son más antiguos van primero
+      return lista.sort((a, b) => {
+        if (!a.ultima_conciliacion && !b.ultima_conciliacion) {
+          return a.nombre.localeCompare(b.nombre);
+        }
+        if (!a.ultima_conciliacion) return -1;
+        if (!b.ultima_conciliacion) return 1;
+        return new Date(a.ultima_conciliacion).getTime() - new Date(b.ultima_conciliacion).getTime();
+      });
+    }
+    if (orden === "reciente") {
+      // Los más recientemente conciliados primero
+      return lista.sort((a, b) => {
+        if (!a.ultima_conciliacion && !b.ultima_conciliacion) {
+          return a.nombre.localeCompare(b.nombre);
+        }
+        if (!a.ultima_conciliacion) return 1;
+        if (!b.ultima_conciliacion) return -1;
+        return new Date(b.ultima_conciliacion).getTime() - new Date(a.ultima_conciliacion).getTime();
+      });
+    }
+    return lista;
+  }, [condominios, orden]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -171,6 +242,110 @@ export default function CondominioSelector({
         </p>
       </div>
 
+      {/* Barra de Filtros y Orden de Prioridad */}
+      {condominios.length > 1 && (
+        <div
+          style={{
+            width: "100%",
+            maxWidth: "680px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            marginBottom: "12px",
+            padding: "0 4px",
+          }}
+        >
+          <span
+            style={{
+              fontSize: "12.5px",
+              color: "rgba(20, 20, 19, 0.45)",
+              fontWeight: 500,
+            }}
+          >
+            {condominios.length} condominios registrados
+          </span>
+
+          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+            <span
+              style={{
+                fontSize: "12px",
+                color: "rgba(20, 20, 19, 0.45)",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "4px",
+              }}
+            >
+              <ArrowUpDown size={12} />
+              Ordenar:
+            </span>
+            <div
+              style={{
+                display: "inline-flex",
+                background: "rgba(0, 0, 0, 0.04)",
+                padding: "2px",
+                borderRadius: "8px",
+                gap: "2px",
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => setOrden("prioridad")}
+                title="Mostrar primero condominios pendientes o con mayor tiempo sin conciliar"
+                style={{
+                  padding: "4px 9px",
+                  borderRadius: "6px",
+                  border: "none",
+                  background: orden === "prioridad" ? "#111110" : "transparent",
+                  color: orden === "prioridad" ? "#ffffff" : "rgba(20, 20, 19, 0.6)",
+                  fontSize: "11.5px",
+                  fontWeight: orden === "prioridad" ? 600 : 500,
+                  cursor: "pointer",
+                  transition: "all 0.15s ease",
+                }}
+              >
+                Prioridad
+              </button>
+              <button
+                type="button"
+                onClick={() => setOrden("alfabetico")}
+                title="Ordenar de la A a la Z"
+                style={{
+                  padding: "4px 9px",
+                  borderRadius: "6px",
+                  border: "none",
+                  background: orden === "alfabetico" ? "#111110" : "transparent",
+                  color: orden === "alfabetico" ? "#ffffff" : "rgba(20, 20, 19, 0.6)",
+                  fontSize: "11.5px",
+                  fontWeight: orden === "alfabetico" ? 600 : 500,
+                  cursor: "pointer",
+                  transition: "all 0.15s ease",
+                }}
+              >
+                A - Z
+              </button>
+              <button
+                type="button"
+                onClick={() => setOrden("reciente")}
+                title="Mostrar primero los conciliados más recientemente"
+                style={{
+                  padding: "4px 9px",
+                  borderRadius: "6px",
+                  border: "none",
+                  background: orden === "reciente" ? "#111110" : "transparent",
+                  color: orden === "reciente" ? "#ffffff" : "rgba(20, 20, 19, 0.6)",
+                  fontSize: "11.5px",
+                  fontWeight: orden === "reciente" ? 600 : 500,
+                  cursor: "pointer",
+                  transition: "all 0.15s ease",
+                }}
+              >
+                Recientes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Rejilla de Condominios Stacked */}
       <div
         style={{
@@ -241,7 +416,7 @@ export default function CondominioSelector({
           </div>
         )}
 
-        {condominios.map((condo) => (
+        {condominiosOrdenados.map((condo) => (
           <div
             key={condo.id}
             onClick={() => onSelectCondominio(condo)}
@@ -315,7 +490,49 @@ export default function CondominioSelector({
               </div>
             </div>
 
-            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+              {/* Badge lateral: Fecha de Última Conciliación */}
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "flex-end",
+                  textAlign: "right",
+                  minWidth: "130px",
+                }}
+              >
+                <div
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "4px",
+                    fontSize: "10.5px",
+                    fontWeight: 600,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.04em",
+                    color: "rgba(20, 20, 19, 0.42)",
+                  }}
+                >
+                  <Clock size={11} style={{ opacity: 0.7 }} />
+                  <span>Última conciliación</span>
+                </div>
+                <div
+                  title={
+                    condo.ultima_conciliacion
+                      ? `Registrada el: ${condo.ultima_conciliacion}`
+                      : "No registra conciliaciones bancarias aún"
+                  }
+                  style={{
+                    fontSize: "12.5px",
+                    fontWeight: 600,
+                    marginTop: "2px",
+                    color: condo.ultima_conciliacion ? "#111110" : "#d97706",
+                  }}
+                >
+                  {formatFechaRelativa(condo.ultima_conciliacion)}
+                </div>
+              </div>
+
               {/* Botón eliminar cuidadoso */}
               <button
                 type="button"

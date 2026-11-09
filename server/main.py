@@ -269,10 +269,10 @@ def list_condominios():
     cursor = conn.cursor()
     cursor.execute("""
         SELECT c.id, c.nombre, c.descripcion, c.icono, c.created_at,
-               COUNT(i.id) as total_inmuebles
+               (SELECT COUNT(*) FROM inmuebles i WHERE i.condominio_id = c.id) as total_inmuebles,
+               (SELECT MAX(ec.fecha_subida) FROM estados_cuenta ec WHERE ec.condominio_id = c.id) as ultima_conciliacion,
+               (SELECT COUNT(*) FROM estados_cuenta ec WHERE ec.condominio_id = c.id) as total_conciliaciones
         FROM condominios c
-        LEFT JOIN inmuebles i ON c.id = i.condominio_id
-        GROUP BY c.id
         ORDER BY c.nombre ASC
     """)
     rows = [dict(r) for r in cursor.fetchall()]
