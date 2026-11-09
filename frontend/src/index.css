@@ -1,0 +1,190 @@
+@font-face {
+  font-family: "Signifier";
+  src: url("/fonts/signifier-300.woff2") format("woff2");
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  --color-bg: #ffffff;
+  --color-surface: #ffffff;
+  --color-surface-hover: #f9f9f8;
+  --color-fg: #141413;
+  --color-fg-muted: rgba(20, 20, 19, 0.6);
+  --color-fg-subtle: rgba(20, 20, 19, 0.4);
+  --color-border-subtle: rgba(0, 0, 0, 0.08);
+  --color-border-focus: rgba(0, 0, 0, 0.25);
+  --color-card: rgba(0, 0, 0, 0.02);
+  --color-card-hover: rgba(0, 0, 0, 0.045);
+  --color-primary: #111110;
+  --color-primary-fg: #ffffff;
+  
+  --font-serif: "Signifier", Georgia, serif;
+  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+  --font-mono: "Geist Mono", "Consolas", monospace;
+  
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-pill: 9999px;
+}
+
+/* PALETA OLED BLACK (Dark Mode Puro) */
+body.theme-dark {
+  --color-bg: #000000;
+  --color-surface: #0a0a0a;
+  --color-surface-hover: #141414;
+  --color-fg: #f5f5f5;
+  --color-fg-muted: rgba(245, 245, 245, 0.65);
+  --color-fg-subtle: rgba(245, 245, 245, 0.4);
+  --color-border-subtle: rgba(255, 255, 255, 0.12);
+  --color-border-focus: rgba(255, 255, 255, 0.35);
+  --color-card: #0d0d0d;
+  --color-card-hover: #171717;
+  --color-primary: #ffffff;
+  --color-primary-fg: #000000;
+  background-color: #000000 !important;
+  color: #f5f5f5 !important;
+}
+
+/* Overrides inteligentes para Modo Oscuro OLED */
+body.theme-dark [style*="background: #ffffff"],
+body.theme-dark [style*="background:#ffffff"],
+body.theme-dark [style*="background: rgb(255, 255, 255)"],
+body.theme-dark [style*="background: white"],
+body.theme-dark [style*="background-color: #ffffff"],
+body.theme-dark [style*="background-color: white"] {
+  background-color: #000000 !important;
+}
+
+body.theme-dark header {
+  background: rgba(0, 0, 0, 0.92) !important;
+  border-bottom-color: rgba(255, 255, 255, 0.12) !important;
+}
+
+body.theme-dark [style*="color: #111110"],
+body.theme-dark [style*="color:#111110"],
+body.theme-dark [style*="color: #141413"],
+body.theme-dark [style*="color: rgb(17, 17, 16)"] {
+  color: #f5f5f5 !important;
+}
+
+body.theme-dark [style*="color: rgba(20, 20, 19,"],
+body.theme-dark [style*="color:rgba(20, 20, 19,"] {
+  color: rgba(245, 245, 245, 0.7) !important;
+}
+
+body.theme-dark [style*="border: 1px solid rgba(0, 0, 0,"],
+body.theme-dark [style*="border-color: rgba(0, 0, 0,"],
+body.theme-dark [style*="border-bottom: 1px solid rgba(0, 0, 0,"],
+body.theme-dark [style*="border-top: 1px solid rgba(0, 0, 0,"] {
+  border-color: rgba(255, 255, 255, 0.12) !important;
+}
+
+body.theme-dark [style*="background: rgba(0, 0, 0, 0.02)"],
+body.theme-dark [style*="background: rgba(0, 0, 0, 0.04)"],
+body.theme-dark [style*="background: rgba(0, 0, 0, 0.03)"] {
+  background-color: #0d0d0d !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+body.theme-dark [style*="background: #111110"],
+body.theme-dark [style*="background:#111110"] {
+  background-color: #ffffff !important;
+  color: #000000 !important;
+}
+
+body.theme-dark input,
+body.theme-dark select,
+body.theme-dark textarea {
+  background-color: #0a0a0a !important;
+  color: #f5f5f5 !important;
+  border-color: rgba(255, 255, 255, 0.16) !important;
+}
+
+body.theme-dark input::placeholder,
+body.theme-dark textarea::placeholder {
+  color: rgba(255, 255, 255, 0.35) !important;
+}
+
+/* Modales en Modo Oscuro */
+body.theme-dark .modal-content,
+body.theme-dark [style*="border-radius: 16px"][style*="max-width"],
+body.theme-dark [style*="border-radius: 18px"][style*="max-width"] {
+  background-color: #0d0d0d !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.8) !important;
+}
+
+/* Tablas y filas */
+body.theme-dark table th {
+  background-color: #0a0a0a !important;
+  color: #a3a3a3 !important;
+  border-bottom-color: rgba(255, 255, 255, 0.12) !important;
+}
+
+body.theme-dark table tr:hover td {
+  background-color: #121212 !important;
+}
+
+body.theme-dark table td {
+  border-bottom-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Scrollbars en tema oscuro */
+body.theme-dark ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+}
+body.theme-dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.35);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-sans);
+  background: var(--color-bg);
+  color: var(--color-fg);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.font-serif {
+  font-family: var(--font-serif);
+}
+
+.font-mono {
+  font-family: var(--font-mono);
+}
+
+/* Scrollbar sutil */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.12);
+  border-radius: var(--radius-pill);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.25);
+}
+
+/* Animaciones suaves */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}

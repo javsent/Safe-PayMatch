@@ -1,0 +1,714 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Keel — Subscription billing for product companies</title>
+    <meta
+      name="description"
+      content="Keel meters usage, prices subscriptions, and sends invoices from one quiet ledger."
+    />
+    <!-- preview-brief: landing -->
+    <!-- preview-vertical: saas -->
+    <!-- preview-product: subscription-billing -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Geist+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="https://cdn.agent-design.com/p/white-signifier-ui-screenshots/preview.css?t=eyJrZXkiOiJwL3doaXRlLXNpZ25pZmllci11aS1zY3JlZW5zaG90cy8iLCJleHAiOjE3OTM2NjMxNTk5Njl9.0Z4i5jIahgDS2M6iPSjLOS2N1i1QUT4kFaoW1SL9DBA" />
+  </head>
+  <body>
+    <header class="site-nav">
+      <div class="site-nav__blur" aria-hidden="true"></div>
+      <div class="site-nav__inner">
+        <a href="https://cdn.agent-design.com/p/white-signifier-ui-screenshots/?t=eyJrZXkiOiJwL3doaXRlLXNpZ25pZmllci11aS1zY3JlZW5zaG90cy8iLCJleHAiOjE3OTM2NjMxNTk5Njl9.0Z4i5jIahgDS2M6iPSjLOS2N1i1QUT4kFaoW1SL9DBA" class="site-nav__logo" aria-label="Keel home">
+          <svg
+            width="18"
+            height="20"
+            viewBox="0 0 18 20"
+            fill="none"
+            aria-hidden="true"
+          >
+            <path
+              d="M9 1.2L16.4 5.4v9.2L9 18.8 1.6 14.6V5.4L9 1.2Z"
+              stroke="currentColor"
+              stroke-width="1.3"
+              stroke-linejoin="round"
+            />
+            <path
+              d="M9 6.2v7.6M6.2 11.4L9 13.8l2.8-2.4"
+              stroke="currentColor"
+              stroke-width="1.3"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+          <span>Keel</span>
+        </a>
+        <nav class="site-nav__links" aria-label="Main">
+          <a href="#path">Metering</a>
+          <a href="#ledger">Ledger</a>
+          <a href="#studio">Plans</a>
+        </nav>
+        <a href="#close" class="site-nav__download">Start sandbox</a>
+      </div>
+    </header>
+
+    <main class="page">
+      <section
+        id="intro"
+        class="section section--intro"
+        aria-label="Introduction"
+      >
+        <div class="hero">
+          <div class="hero__intro">
+            <div class="hero__copy">
+              <a href="#studio" class="hero__badge">
+                <span class="hero__badge-pill"
+                  >Usage meters, now generally available</span
+                >
+                <svg
+                  class="hero__badge-chevron"
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  aria-hidden="true"
+                >
+                  <path
+                    fill-rule="evenodd"
+                    clip-rule="evenodd"
+                    d="M15.5859 12.0001L8.29297 4.70718L9.70718 3.29297L18.4143 12.0001L9.70718 20.7072L8.29297 19.293L15.5859 12.0001Z"
+                    fill="currentColor"
+                  />
+                </svg>
+              </a>
+              <h1 class="hero__title animate-blur-fade">
+                Subscriptions, usage, and invoices in one quiet ledger.
+              </h1>
+              <p class="hero__subcopy animate-blur-fade">
+                Meter events, price them, and send invoices without a
+                spreadsheet in between. Built for teams who sell software, not
+                payment pages.
+              </p>
+            </div>
+            <div class="hero__actions animate-blur-fade">
+              <div class="hero__buttons">
+                <a href="#close" class="hero__btn hero__btn--primary"
+                  >Start sandbox</a
+                >
+                <a href="#ledger" class="hero__btn hero__btn--secondary"
+                  >See the ledger</a
+                >
+              </div>
+              <div class="hero__platforms">
+                <span class="hero__platform-link">Sandbox in two minutes</span>
+                <span aria-hidden="true">·</span>
+                <span class="hero__platform-link">No sales call required</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="hero__visual">
+            <div class="hero-stage animate-fade-in">
+              <div class="hero-stage__frame media-frame">
+                <div class="app" aria-label="Keel ledger dashboard">
+                  <aside class="app__side">
+                    <div class="app__brand">
+                      <svg
+                        width="14"
+                        height="16"
+                        viewBox="0 0 18 20"
+                        fill="none"
+                        aria-hidden="true"
+                      >
+                        <path
+                          d="M9 1.2L16.4 5.4v9.2L9 18.8 1.6 14.6V5.4L9 1.2Z"
+                          stroke="currentColor"
+                          stroke-width="1.4"
+                        />
+                      </svg>
+                      Keel
+                    </div>
+                    <p class="app__nav-label">Workspace</p>
+                    <div class="app__nav-item is-active">Ledger</div>
+                    <div class="app__nav-item">Customers</div>
+                    <div class="app__nav-item">Plans</div>
+                    <div class="app__nav-item">Meters</div>
+                    <p class="app__nav-label">Finance</p>
+                    <div class="app__nav-item">Invoices</div>
+                    <div class="app__nav-item">Payouts</div>
+                  </aside>
+                  <div class="app__main">
+                    <div class="app__toolbar">
+                      <div class="app__search">Search invoices</div>
+                      <p class="app__toolbar-meta">August 2026 · UTC</p>
+                    </div>
+                    <div class="app__body">
+                      <dl class="app__kpis">
+                        <div class="app__kpi">
+                          <dt>Recognized MRR</dt>
+                          <dd>$184,220</dd>
+                        </div>
+                        <div class="app__kpi">
+                          <dt>Open invoices</dt>
+                          <dd>12</dd>
+                        </div>
+                        <div class="app__kpi">
+                          <dt>Failed this week</dt>
+                          <dd>3</dd>
+                        </div>
+                      </dl>
+                      <table class="app__table">
+                        <thead>
+                          <tr>
+                            <th>Customer</th>
+                            <th>Plan</th>
+                            <th>Invoice</th>
+                            <th>Status</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr>
+                            <td>Sundial Audio</td>
+                            <td>Pro annual</td>
+                            <td class="app__mono">INV-2041</td>
+                            <td>
+                              <span class="app__status app__status--ok"
+                                >Paid</span
+                              >
+                            </td>
+                          </tr>
+                          <tr>
+                            <td>Oak &amp; Wire</td>
+                            <td>Usage + seat</td>
+                            <td class="app__mono">INV-2040</td>
+                            <td><span class="app__status">Retrying</span></td>
+                          </tr>
+                          <tr>
+                            <td>Birch Press</td>
+                            <td>Studio</td>
+                            <td class="app__mono">INV-2038</td>
+                            <td>
+                              <span class="app__status app__status--ok"
+                                >Paid</span
+                              >
+                            </td>
+                          </tr>
+                          <tr>
+                            <td>Copperline</td>
+                            <td>Usage</td>
+                            <td class="app__mono">INV-2036</td>
+                            <td><span class="app__status">Draft</span></td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="path" class="section section--path">
+        <div class="content-wrap content-wrap--narrow">
+          <div class="path__intro" data-animate>
+            <h2 class="heading-lg">Three steps from event to cash.</h2>
+            <p class="subcopy">
+              Keep pricing in the product, not in a finance spreadsheet. Meter,
+              price, and invoice on the same ledger.
+            </p>
+          </div>
+          <div class="path__grid">
+            <article class="path-card" data-animate>
+              <div class="path-card__art" aria-hidden="true">
+                <div class="mini">
+                  <div class="mini__row">
+                    <span class="mini__name">api.request</span
+                    ><span class="mini__code">+12,480</span>
+                  </div>
+                  <div class="mini__row">
+                    <span class="mini__name">seat.added</span
+                    ><span class="mini__code">+3</span>
+                  </div>
+                  <div class="mini__row">
+                    <span class="mini__name">storage.gb</span
+                    ><span class="mini__code">+41.2</span>
+                  </div>
+                  <div class="mini__bars">
+                    <span class="mini__bar mini__bar--a"></span>
+                    <span class="mini__bar is-accent mini__bar--b"></span>
+                    <span class="mini__bar mini__bar--c"></span>
+                    <span class="mini__bar is-accent mini__bar--d"></span>
+                    <span class="mini__bar mini__bar--e"></span>
+                    <span class="mini__bar mini__bar--f"></span>
+                  </div>
+                </div>
+              </div>
+              <div class="path-card__body">
+                <h3 class="path-card__title">Meter</h3>
+                <p class="path-card__desc">
+                  Ingest events with idempotent keys. Group by customer, seat,
+                  or resource.
+                </p>
+              </div>
+            </article>
+            <article class="path-card" data-animate>
+              <div class="path-card__art" aria-hidden="true">
+                <span class="price-chip">
+                  <span class="price-chip__check">
+                    <svg width="8" height="8" viewBox="0 0 10 10" fill="none">
+                      <path
+                        d="M2 5 L4.2 7.2 L8 3"
+                        stroke="white"
+                        stroke-width="1.6"
+                        fill="none"
+                        stroke-linecap="round"
+                      />
+                    </svg>
+                  </span>
+                  $0.004 / 1k events
+                </span>
+              </div>
+              <div class="path-card__body">
+                <div class="path-card__title-row">
+                  <h3 class="path-card__title">Price</h3>
+                  <span class="chip-opt-in">Graduated</span>
+                </div>
+                <p class="path-card__desc">
+                  Seat, usage, and credits on one plan. Change prices without
+                  rewriting invoices.
+                </p>
+              </div>
+            </article>
+            <article class="path-card" data-animate>
+              <div class="path-card__art" aria-hidden="true">
+                <div class="invoice-mini">
+                  <div class="invoice-mini__top">
+                    <span>invoice.pdf</span><span>INV-2041</span>
+                  </div>
+                  <div class="invoice-mini__lines">
+                    <span
+                      class="invoice-mini__line invoice-mini__line--full"
+                    ></span>
+                    <span
+                      class="invoice-mini__line invoice-mini__line--wide"
+                    ></span>
+                    <span
+                      class="invoice-mini__line invoice-mini__line--accent"
+                    ></span>
+                    <span
+                      class="invoice-mini__line invoice-mini__line--short"
+                    ></span>
+                  </div>
+                  <p class="invoice-mini__total">Due $2,480</p>
+                </div>
+              </div>
+              <div class="path-card__body">
+                <h3 class="path-card__title">Invoice</h3>
+                <p class="path-card__desc">
+                  Draft, send, and retry from the ledger. Tax and credits land
+                  on the same document.
+                </p>
+              </div>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section id="ledger" class="section section--ledger">
+        <div class="content-wrap">
+          <div class="ledger__intro" data-animate>
+            <h2 class="heading-xl">
+              A workspace that reads like finance, not a dashboard kit.
+            </h2>
+            <p class="subcopy">
+              Revenue, open invoices, and usage sit in one frame. Hover a
+              period, inspect a customer, queue a retry.
+            </p>
+          </div>
+          <div class="ledger-stage" data-animate>
+            <div class="media-frame">
+              <div class="workspace" aria-label="Revenue workspace">
+                <div class="workspace__chart">
+                  <div class="workspace__head">
+                    <h3 class="workspace__title">Recognized revenue</h3>
+                    <p class="workspace__range">Last 12 months</p>
+                  </div>
+                  <svg
+                    class="chart"
+                    viewBox="0 0 520 180"
+                    fill="none"
+                    aria-hidden="true"
+                  >
+                    <g stroke="rgba(0,0,0,0.08)" stroke-width="1">
+                      <line x1="8" y1="20" x2="512" y2="20" />
+                      <line x1="8" y1="70" x2="512" y2="70" />
+                      <line x1="8" y1="120" x2="512" y2="120" />
+                      <line x1="8" y1="160" x2="512" y2="160" />
+                    </g>
+                    <text x="8" y="16" fill="rgba(0,0,0,0.35)" font-size="10">
+                      $200k
+                    </text>
+                    <text x="8" y="116" fill="rgba(0,0,0,0.35)" font-size="10">
+                      $80k
+                    </text>
+                    <path
+                      d="M20 140 C60 132, 90 118, 130 110 C170 100, 200 92, 240 78 C280 64, 310 70, 350 52 C390 36, 430 44, 500 28"
+                      stroke="var(--color-accent)"
+                      stroke-width="2"
+                    />
+                    <circle
+                      cx="500"
+                      cy="28"
+                      r="3.5"
+                      fill="var(--color-accent)"
+                    />
+                  </svg>
+                  <div class="chart-axis">
+                    <span>Sep</span><span>Nov</span><span>Jan</span
+                    ><span>Mar</span><span>May</span><span>Jul</span>
+                  </div>
+                  <div class="workspace__rows">
+                    <div class="workspace__row">
+                      <strong>Sundial Audio</strong><span>Pro annual</span
+                      ><span>$18,400</span>
+                    </div>
+                    <div class="workspace__row">
+                      <strong>Oak &amp; Wire</strong><span>Usage + seat</span
+                      ><span>$9,120</span>
+                    </div>
+                    <div class="workspace__row">
+                      <strong>Birch Press</strong><span>Studio</span
+                      ><span>$6,880</span>
+                    </div>
+                  </div>
+                </div>
+                <aside class="workspace__side">
+                  <div class="glass-card">
+                    <h3>This period</h3>
+                    <dl>
+                      <dt>New MRR</dt>
+                      <dd>$12,400</dd>
+                      <dt>Expansion</dt>
+                      <dd>$3,180</dd>
+                      <dt>Churned</dt>
+                      <dd>−$1,920</dd>
+                      <dt>Net</dt>
+                      <dd>$13,660</dd>
+                    </dl>
+                  </div>
+                  <div class="glass-card">
+                    <h3>Collection</h3>
+                    <dl>
+                      <dt>Paid on time</dt>
+                      <dd>94%</dd>
+                      <dt>In dunning</dt>
+                      <dd>3</dd>
+                      <dt>Written off</dt>
+                      <dd>0</dd>
+                    </dl>
+                  </div>
+                </aside>
+              </div>
+            </div>
+            <aside class="ledger-float ledger-float--usage" aria-hidden="true">
+              <span class="ledger-float__tag">Meter</span>
+              <p class="float-card__title">api.request · Oak &amp; Wire</p>
+              <p>4.2M events this cycle. Next band starts at 5M.</p>
+            </aside>
+            <aside class="ledger-float ledger-float--rule" aria-hidden="true">
+              <span class="ledger-float__tag">Rule</span>
+              <p class="float-card__title">Retry on declined cards</p>
+              <p>Three attempts over five days, then pause the subscription.</p>
+            </aside>
+          </div>
+        </div>
+      </section>
+
+      <section id="recovery" class="section section--recovery">
+        <div class="content-wrap">
+          <div class="recovery">
+            <div class="recovery__copy" data-animate>
+              <h2 class="heading-lg">Failed payments, handled in writing.</h2>
+              <p class="subcopy">
+                Keel drafts a dunning note from the invoice, schedules retries,
+                and pauses only after the last attempt. Finance can see the
+                thread next to the ledger row.
+              </p>
+              <div class="recovery__pills">
+                <span class="devices__pill">Smart retries</span>
+                <span class="devices__pill">Pause, don’t delete</span>
+                <span class="devices__pill">One thread per invoice</span>
+              </div>
+            </div>
+            <div class="media-frame" data-animate>
+              <article class="mail" aria-label="Dunning email preview">
+                <div class="mail__bar">
+                  <span class="mail__dot"></span>
+                  <span>Draft to finance@oakandwire.co</span>
+                </div>
+                <div class="mail__body">
+                  <p class="mail__from">From Keel · Invoice INV-2040</p>
+                  <h3 class="mail__subject">
+                    We couldn’t charge the card on file
+                  </h3>
+                  <p class="mail__text">
+                    Hi Rowan — the August invoice for Oak &amp; Wire ($9,120)
+                    was declined. We’ll retry in 8 hours. Update the card if
+                    this was expected; the subscription stays active until
+                    Friday.
+                  </p>
+                  <span class="mail__cta">Update payment method</span>
+                  <p class="mail__meta">
+                    attempt 1 of 3 · retry 23:10 UTC · INV-2040
+                  </p>
+                </div>
+              </article>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="studio" class="section section--studio">
+        <div class="content-wrap">
+          <div class="studio__intro" data-animate>
+            <h2 class="heading-xl">
+              Plan studio for seats, usage, and credits.
+            </h2>
+            <p class="subcopy">
+              Edit a plan once. Invoices, meters, and credit notes inherit the
+              change on the next cycle.
+            </p>
+          </div>
+          <div class="surfaces__tabs-wrap" data-animate>
+            <div
+              class="surfaces__tabs"
+              role="tablist"
+              aria-label="Plan studio views"
+            >
+              <button
+                type="button"
+                role="tab"
+                class="surfaces__tab is-active"
+                aria-selected="true"
+                data-tab="plans"
+              >
+                <span class="surfaces__tab-indicator" aria-hidden="true"></span>
+                <span class="surfaces__tab-label">Plans</span>
+              </button>
+              <button
+                type="button"
+                role="tab"
+                class="surfaces__tab"
+                aria-selected="false"
+                data-tab="usage"
+              >
+                <span class="surfaces__tab-label">Usage</span>
+              </button>
+              <button
+                type="button"
+                role="tab"
+                class="surfaces__tab"
+                aria-selected="false"
+                data-tab="credits"
+              >
+                <span class="surfaces__tab-label">Credits</span>
+              </button>
+            </div>
+          </div>
+          <div class="media-frame studio-frame" data-animate>
+            <div class="studio-shot is-active" data-shot="plans">
+              <div class="plan">
+                <div class="plan__list">
+                  <div class="plan__item is-on">
+                    <strong>Studio</strong><span>$79 / seat / mo</span>
+                  </div>
+                  <div class="plan__item">
+                    <strong>Pro annual</strong><span>$840 / seat / yr</span>
+                  </div>
+                  <div class="plan__item">
+                    <strong>Usage + seat</strong><span>$29 + meter</span>
+                  </div>
+                </div>
+                <div class="plan__editor">
+                  <div class="plan__field">
+                    <b>Display name</b><em>Studio</em>
+                  </div>
+                  <div class="plan__field">
+                    <b>Seat price</b><em>7900 cents</em>
+                  </div>
+                  <div class="plan__field"><b>Trial</b><em>14 days</em></div>
+                  <div class="plan__field">
+                    <b>Tax behavior</b><em>exclusive</em>
+                  </div>
+                  <div class="plan__field">
+                    <b>Proration</b><em>create_prorations</em>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="studio-shot" data-shot="usage">
+              <div class="usage-grid">
+                <div class="usage-cell">
+                  <span>Events this cycle</span><strong>4.2M</strong>
+                </div>
+                <div class="usage-cell">
+                  <span>Included</span><strong>2.0M</strong>
+                </div>
+                <div class="usage-cell">
+                  <span>Overage</span><strong>2.2M</strong>
+                </div>
+                <div class="usage-cell">
+                  <span>Overage total</span><strong>$8,800</strong>
+                </div>
+              </div>
+            </div>
+            <div class="studio-shot" data-shot="credits">
+              <div class="credit-note">
+                <h3>Credit note CN-118</h3>
+                <p>
+                  Issued against INV-2038 for Birch Press after a two-week
+                  outage. Applies before tax on the next invoice.
+                </p>
+                <p class="credit-note__amt">−$640.00</p>
+              </div>
+            </div>
+          </div>
+          <p class="studio__caption">
+            Plans, meters, and credit notes share one customer record. Nothing
+            is priced twice.
+          </p>
+        </div>
+      </section>
+
+      <section id="rails" class="section section--rails">
+        <div class="content-wrap">
+          <div class="rails__intro" data-animate>
+            <h3 class="heading-md">What the ledger can settle</h3>
+            <p class="subcopy">
+              Cards, transfers, tax, and credits — native line items, not
+              plugins with a different UI.
+            </p>
+          </div>
+          <div class="rails__grid" data-animate>
+            <div class="rails-card">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <rect
+                  x="3"
+                  y="6"
+                  width="18"
+                  height="12"
+                  rx="2"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                />
+                <path d="M3 10h18" stroke="currentColor" stroke-width="1.5" />
+              </svg>
+              <span>Cards</span>
+            </div>
+            <div class="rails-card">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path
+                  d="M4 17V7h16v10H4Z"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                />
+                <path
+                  d="M8 12h8M8 9h5"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  stroke-linecap="round"
+                />
+              </svg>
+              <span>ACH</span>
+            </div>
+            <div class="rails-card">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path
+                  d="M12 3v18M7 8c1.5-2 8.5-2 10 0M7 16c1.5 2 8.5 2 10 0"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  stroke-linecap="round"
+                />
+              </svg>
+              <span>Tax</span>
+            </div>
+            <div class="rails-card">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path
+                  d="M12 5v14M8 9h5.5a2.5 2.5 0 0 1 0 5H8"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  stroke-linecap="round"
+                />
+              </svg>
+              <span>Credits</span>
+            </div>
+            <div class="rails-card">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path
+                  d="M5 7h14v4H5V7Zm0 6h9v4H5v-4Z"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                />
+              </svg>
+              <span>Coupons</span>
+            </div>
+            <div class="rails-card">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path
+                  d="M4 12h6l2-3 3 6 2-3h3"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+              <span>Webhooks</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="close" class="section section--close">
+        <div class="cta__inner content-wrap content-wrap--narrow">
+          <h2 class="cta__title" data-animate>
+            Open a sandbox and send a test invoice today
+          </h2>
+          <div class="cta__actions" data-animate>
+            <a href="#" class="cta__download">Start sandbox</a>
+            <span class="cta__note"
+              >Free while you test · Card not required · Export anytime</span
+            >
+          </div>
+        </div>
+      </section>
+
+      <section id="site-footer" class="section section--footer">
+        <footer class="site-footer">
+          <div class="site-footer__wrap">
+            <div class="site-footer__inner">
+              <div class="site-footer__brand">
+                <p class="site-footer__wordmark">Keel</p>
+                <p class="site-footer__copyright">© 2026 Keel</p>
+              </div>
+              <nav class="site-footer__links" aria-label="Footer">
+                <a href="#" class="site-footer__link">Docs</a>
+                <a href="#" class="site-footer__link">Pricing</a>
+                <a href="#" class="site-footer__link">Changelog</a>
+                <a href="#" class="site-footer__link">Status</a>
+                <a href="#" class="site-footer__link">Terms</a>
+                <a href="#" class="site-footer__link">Privacy</a>
+              </nav>
+            </div>
+          </div>
+        </footer>
+      </section>
+    </main>
+    <script src="https://cdn.agent-design.com/p/white-signifier-ui-screenshots/preview.js?t=eyJrZXkiOiJwL3doaXRlLXNpZ25pZmllci11aS1zY3JlZW5zaG90cy8iLCJleHAiOjE3OTM2NjMxNTk5Njl9.0Z4i5jIahgDS2M6iPSjLOS2N1i1QUT4kFaoW1SL9DBA" defer></script>
+  </body>
+</html>

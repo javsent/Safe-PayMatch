@@ -1,0 +1,36 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+build/
+dist/
+installer_output/
+*.spec
+
+# Database (Development local databases)
+*.db
+*.sqlite
+*.sqlite3
+server/*.db
+
+# Frontend dependencies and builds
+frontend/node_modules/
+frontend/dist/
+frontend/dist-ssr/
+
+# Logs and temporary files
+*.log
+scratch/
+temp/
+tmp/
+
+# OS and IDE files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
