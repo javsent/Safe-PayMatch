@@ -20,6 +20,7 @@ export default function ColumnMapperModal({
   carpetaNombre,
   esHistorico = false,
   titulo = "",
+  bancoNombre = "",
   onSuccess,
 }) {
   const [loading, setLoading] = useState(false);
@@ -108,7 +109,7 @@ export default function ColumnMapperModal({
       const formData = new FormData();
       formData.append("file", file);
       formData.append("mapping", JSON.stringify(finalMapping));
-      formData.append("banco", "Mapeo Manual");
+      formData.append("banco", bancoNombre || "Mapeo Manual");
       formData.append("es_historico", esHistorico ? "true" : "false");
       formData.append("titulo", titulo || "");
       if (carpetaId) formData.append("carpeta_id", carpetaId.toString());

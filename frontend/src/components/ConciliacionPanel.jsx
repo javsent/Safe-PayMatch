@@ -50,6 +50,9 @@ import {
   deleteCarpeta,
   fusionarCarpetas,
   moverConciliacion,
+  fetchBancos,
+  createBanco,
+  deleteBanco,
 } from "../api";
 
 export default function ConciliacionPanel({
@@ -76,7 +79,56 @@ export default function ConciliacionPanel({
   const [movimientos, setMovimientos] = useState([]);
   const [filtroTipo, setFiltroTipo] = useState("ingresos"); // 'ingresos', 'todos', 'pendientes', 'confirmados'
   const [searchTerm, setSearchTerm] = useState("");
-  const [bancoSeleccionado, setBancoSeleccionado] = useState("auto"); // 'auto', 'bnc', 'exterior', '100banco'
+  const [bancoSeleccionado, setBancoSeleccionado] = useState("auto"); // 'auto', 'bnc', 'exterior', '100banco' o nombre personalizado
+  const [bancosList, setBancosList] = useState([]);
+  const [mostrarInputOtroBanco, setMostrarInputOtroBanco] = useState(false);
+  const [nombreNuevoBanco, setNombreNuevoBanco] = useState("");
+  const [guardandoBanco, setGuardandoBanco] = useState(false);
+
+  useEffect(() => {
+    loadBancos();
+  }, []);
+
+  const loadBancos = async () => {
+    try {
+      const data = await fetchBancos();
+      setBancosList(data);
+    } catch (e) {
+      console.warn("Error cargando lista de bancos", e);
+    }
+  };
+
+  const handleGuardarNuevoBanco = async () => {
+    const nom = nombreNuevoBanco.trim();
+    if (!nom) return;
+    try {
+      setGuardandoBanco(true);
+      await createBanco(nom);
+      await loadBancos();
+      setBancoSeleccionado(nom);
+      setNombreNuevoBanco("");
+      setMostrarInputOtroBanco(false);
+      showNotice(`Banco "${nom}" guardado en tu lista personalizada.`);
+    } catch (e) {
+      alert("Error al guardar banco: " + (e.message || e));
+    } finally {
+      setGuardandoBanco(false);
+    }
+  };
+
+  const handleEliminarBanco = async (bancoNom) => {
+    if (!confirm(`¿Eliminar el banco "${bancoNom}" de tu lista personalizada?`)) return;
+    try {
+      await deleteBanco(bancoNom);
+      if (bancoSeleccionado === bancoNom) {
+        setBancoSeleccionado("auto");
+      }
+      await loadBancos();
+      showNotice(`Banco "${bancoNom}" eliminado.`);
+    } catch (e) {
+      alert("Error al eliminar banco: " + (e.message || e));
+    }
+  };
   const [esHistorico, setEsHistorico] = useState(false);
   const [tituloNuevo, setTituloNuevo] = useState("");
   const [editandoTitulo, setEditandoTitulo] = useState(false);
@@ -1463,26 +1515,125 @@ export default function ConciliacionPanel({
               <div style={{ display: "flex", gap: "12px", width: "100%", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13px", color: "rgba(20, 20, 19, 0.7)" }}>
                   <span>Banco:</span>
-                  <select
-                    value={bancoSeleccionado}
-                    onChange={(e) => setBancoSeleccionado(e.target.value)}
-                    style={{
-                      padding: "6px 10px",
-                      borderRadius: "8px",
-                      border: "1px solid rgba(0, 0, 0, 0.12)",
-                      background: "#ffffff",
-                      fontSize: "12.5px",
-                      color: "#111110",
-                      fontWeight: 500,
-                      outline: "none",
-                      cursor: "pointer",
-                    }}
-                  >
-                    <option value="auto">✨ Auto-detectar (Recomendado)</option>
-                    <option value="bnc">BNC (Banco Nacional de Crédito)</option>
-                    <option value="exterior">Banco Exterior</option>
-                    <option value="100banco">100%Banco</option>
-                  </select>
+                  <div style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                    <select
+                      value={bancoSeleccionado}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val === "__otro__") {
+                          setMostrarInputOtroBanco(true);
+                        } else {
+                          setMostrarInputOtroBanco(false);
+                          setBancoSeleccionado(val);
+                        }
+                      }}
+                      style={{
+                        padding: "6px 10px",
+                        borderRadius: "8px",
+                        border: "1px solid rgba(0, 0, 0, 0.12)",
+                        background: "#ffffff",
+                        fontSize: "12.5px",
+                        color: "#111110",
+                        fontWeight: 500,
+                        outline: "none",
+                        cursor: "pointer",
+                      }}
+                    >
+                      <option value="auto">✨ Auto-detectar (Recomendado)</option>
+                      <option value="bnc">BNC (Banco Nacional de Crédito)</option>
+                      <option value="exterior">Banco Exterior</option>
+                      <option value="100banco">100%Banco</option>
+                      {bancosList.filter(b => b.tipo === "personalizado").map((b) => (
+                        <option key={b.id} value={b.nombre}>🏦 {b.nombre} (Guardado)</option>
+                      ))}
+                      <option value="__otro__">➕ Otro banco...</option>
+                    </select>
+
+                    {bancosList.some(b => b.tipo === "personalizado" && b.nombre === bancoSeleccionado) && (
+                      <button
+                        type="button"
+                        onClick={() => handleEliminarBanco(bancoSeleccionado)}
+                        style={{
+                          background: "transparent",
+                          border: "none",
+                          cursor: "pointer",
+                          color: "#ef4444",
+                          padding: "4px",
+                          display: "flex",
+                          alignItems: "center",
+                          borderRadius: "4px",
+                        }}
+                        title={`Eliminar "${bancoSeleccionado}" de tus bancos guardados`}
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    )}
+                  </div>
+
+                  {mostrarInputOtroBanco && (
+                    <div style={{ display: "inline-flex", alignItems: "center", gap: "6px", background: "rgba(16, 185, 129, 0.08)", padding: "4px 8px", borderRadius: "8px", border: "1px solid rgba(16, 185, 129, 0.3)" }}>
+                      <input
+                        type="text"
+                        placeholder="Nombre del banco (ej. Banesco)"
+                        value={nombreNuevoBanco}
+                        onChange={(e) => setNombreNuevoBanco(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") handleGuardarNuevoBanco();
+                          if (e.key === "Escape") {
+                            setMostrarInputOtroBanco(false);
+                            setBancoSeleccionado("auto");
+                          }
+                        }}
+                        autoFocus
+                        style={{
+                          padding: "5px 8px",
+                          borderRadius: "6px",
+                          border: "1px solid #10b981",
+                          fontSize: "12px",
+                          outline: "none",
+                          width: "190px",
+                          background: "#ffffff",
+                          color: "#111110",
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={handleGuardarNuevoBanco}
+                        disabled={guardandoBanco || !nombreNuevoBanco.trim()}
+                        style={{
+                          padding: "5px 10px",
+                          borderRadius: "6px",
+                          background: "#10b981",
+                          color: "#ffffff",
+                          border: "none",
+                          fontSize: "11.5px",
+                          fontWeight: 600,
+                          cursor: "pointer",
+                        }}
+                      >
+                        {guardandoBanco ? "..." : "Guardar"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMostrarInputOtroBanco(false);
+                          setBancoSeleccionado("auto");
+                        }}
+                        style={{
+                          background: "transparent",
+                          border: "none",
+                          color: "#71717a",
+                          cursor: "pointer",
+                          padding: "2px",
+                          display: "flex",
+                          alignItems: "center",
+                        }}
+                        title="Cancelar"
+                      >
+                        <X size={15} />
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 <label
@@ -2653,6 +2804,7 @@ export default function ConciliacionPanel({
         carpetaNombre={carpetaModoSubida === "nueva" ? carpetaNuevaNombreSubida.trim() : ""}
         esHistorico={esHistorico}
         titulo={tituloNuevo.trim()}
+        bancoNombre={bancoSeleccionado !== "auto" ? bancoSeleccionado : ""}
         onSuccess={(data) => {
           setEstadoCuenta(data);
           setMovimientos(data.movimientos || []);

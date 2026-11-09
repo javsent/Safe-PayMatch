@@ -86,6 +86,10 @@ def detect_bank_and_parse(
             banco = "100%Banco"
         elif selected_bank in ["exterior"]:
             banco = "Banco Exterior"
+        elif selected_bank in ["bnc"]:
+            banco = "BNC"
+        elif selected_bank not in ["auto", ""]:
+            banco = bank_hint.strip()
         else:
             banco = "BNC"
         # Normalizar referencias
@@ -129,8 +133,20 @@ def detect_bank_and_parse(
         "CIRJUR" in sample_upper
     )
 
-    detected_bank = "BNC"
-    if selected_bank in ["100banco", "100%banco"] or (selected_bank == "auto" and is_100banco):
+    is_custom_bank = selected_bank not in ["auto", "bnc", "exterior", "100banco", "100%banco"]
+    detected_bank = bank_hint.strip() if is_custom_bank else "BNC"
+
+    if is_custom_bank:
+        # Banco personalizado indicado por el usuario: intentar parseo genérico primero
+        _, movimientos = parse_generic(file_bytes, filename)
+        if not movimientos:
+            if is_exterior or "9742" in sample_upper:
+                movimientos = parse_exterior_pdf(file_bytes)
+            elif is_100banco:
+                movimientos = parse_100banco_pdf(file_bytes)
+            else:
+                movimientos = parse_bnc_pdf(file_bytes)
+    elif selected_bank in ["100banco", "100%banco"] or (selected_bank == "auto" and is_100banco):
         detected_bank = "100%Banco"
         movimientos = parse_100banco_pdf(file_bytes)
     elif selected_bank == "exterior" or (selected_bank == "auto" and is_exterior and not is_bnc):

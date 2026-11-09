@@ -26,7 +26,7 @@ from server.models import (
     ConfirmacionMovimiento, ConfirmacionLote, MovimientoResponse,
     EstadoCuentaUpdate, INMUEBLE_ALLOWED_FIELDS,
     CarpetaCreate, CarpetaUpdate, CarpetaFusionar, MoverConciliacion,
-    ReportePersonalizadoExport, DownloadUpdateRequest
+    ReportePersonalizadoExport, DownloadUpdateRequest, BancoCreate
 )
 import json
 from server.parser_router import detect_bank_and_parse, deduplicate_movements, normalize_ref
@@ -69,7 +69,7 @@ def api_check_update():
     return check_for_updates()
 
 @app.post("/api/system/download-update")
-def api_download_update(payload: DownloadUpdateRequest):
+def api_download_update(payload: DownloadUpdateRequest, BancoCreate):
     return start_download_update(payload.url, payload.version)
 
 @app.get("/api/system/download-status")
@@ -79,6 +79,60 @@ def api_download_status():
 @app.post("/api/system/apply-update")
 def api_apply_update():
     return apply_update_and_restart()
+
+
+# -------------------------------------------------------------
+# BANCOS (SISTEMA + PERSONALIZADOS)
+# -------------------------------------------------------------
+
+@app.get("/api/bancos")
+def list_bancos():
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, nombre, created_at FROM bancos_personalizados ORDER BY nombre ASC")
+    custom = [dict(r) for r in cursor.fetchall()]
+    conn.close()
+
+    bancos = [
+        {"id": "auto", "nombre": "✨ Auto-detectar (Recomendado)", "tipo": "sistema"},
+        {"id": "bnc", "nombre": "BNC (Banco Nacional de Crédito)", "tipo": "sistema"},
+        {"id": "exterior", "nombre": "Banco Exterior", "tipo": "sistema"},
+        {"id": "100banco", "nombre": "100%Banco", "tipo": "sistema"},
+    ]
+    for b in custom:
+        bancos.append({
+            "id": b["nombre"],
+            "nombre": b["nombre"],
+            "tipo": "personalizado"
+        })
+    return bancos
+
+@app.post("/api/bancos")
+def create_banco(payload: BancoCreate):
+    nom = payload.nombre.strip()
+    if not nom:
+        raise HTTPException(status_code=400, detail="El nombre del banco no puede estar vacío.")
+
+    sistema = ["auto", "bnc", "exterior", "100banco", "banco exterior", "banco nacional de crédito", "100%banco"]
+    if nom.lower() in sistema:
+        return {"ok": True, "nombre": nom, "message": "Banco del sistema"}
+
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("INSERT OR IGNORE INTO bancos_personalizados (nombre) VALUES (?)", (nom,))
+    conn.commit()
+    conn.close()
+    return {"ok": True, "nombre": nom}
+
+@app.delete("/api/bancos/{nombre}")
+def delete_banco(nombre: str):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM bancos_personalizados WHERE nombre = ?", (nombre,))
+    conn.commit()
+    conn.close()
+    return {"ok": True, "nombre": nombre}
+
 
 
 # -------------------------------------------------------------
@@ -1366,7 +1420,7 @@ def get_reporte_movimientos(
 @app.post("/api/condominios/{condominio_id}/exportar-reporte-personalizado")
 def exportar_reporte_personalizado(
     condominio_id: int,
-    payload: ReportePersonalizadoExport, DownloadUpdateRequest
+    payload: ReportePersonalizadoExport, DownloadUpdateRequest, BancoCreate
 ):
     """
     Genera y descarga el archivo Excel o PDF con las transacciones previsualizadas

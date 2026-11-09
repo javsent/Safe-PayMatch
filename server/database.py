@@ -187,6 +187,16 @@ def init_db():
     );
     """)
 
+    
+    # Tabla Bancos Personalizados (Guardados por el usuario)
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS bancos_personalizados (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nombre TEXT UNIQUE NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    ''')
+
     conn.commit()
     conn.close()
 

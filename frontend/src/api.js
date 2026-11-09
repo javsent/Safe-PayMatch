@@ -388,3 +388,34 @@ export async function applyAppUpdate() {
   if (!res.ok) throw new Error("Error ejecutando actualizador");
   return res.json();
 }
+
+// ---------------------------------------------------------------------------
+// BANCOS (SISTEMA + PERSONALIZADOS)
+// ---------------------------------------------------------------------------
+
+export async function fetchBancos() {
+  const res = await fetch(`${API_BASE}/bancos`);
+  if (!res.ok) throw new Error("Error obteniendo bancos");
+  return res.json();
+}
+
+export async function createBanco(nombre) {
+  const res = await fetch(`${API_BASE}/bancos`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ nombre }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Error guardando banco");
+  }
+  return res.json();
+}
+
+export async function deleteBanco(nombre) {
+  const res = await fetch(`${API_BASE}/bancos/${encodeURIComponent(nombre)}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) throw new Error("Error eliminando banco");
+  return res.json();
+}

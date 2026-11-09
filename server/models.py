@@ -105,3 +105,6 @@ class ReportePersonalizadoExport(BaseModel):
 class DownloadUpdateRequest(BaseModel):
     url: str
     version: str
+
+class BancoCreate(BaseModel):
+    nombre: str

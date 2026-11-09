@@ -3,7 +3,7 @@
 
 #define MyAppName "Safe-PayMatch"
 #ifndef MyAppVersion
-#define MyAppVersion "1.1.0"
+#define MyAppVersion "1.1.1"
 #endif
 #define MyAppPublisher "rybak.Software"
 #define MyAppURL "https://github.com/javsent/Safe-PayMatch"
