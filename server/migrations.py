@@ -1,6 +1,11 @@
 import sqlite3
 import os
+import sys
 import re
+
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if ROOT_DIR not in sys.path:
+    sys.path.insert(0, ROOT_DIR)
 
 DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "safe_paymatch.db")
 
@@ -147,6 +152,63 @@ def run_db_upgrades():
             print(f"[CARPETAS] Creada carpeta '{nombre_carpeta}' para condominio {c_id}")
 
         cursor.execute("UPDATE estados_cuenta SET carpeta_id = ? WHERE id = ?", (target_carpeta_id, ec["id"]))
+
+    # 8. Normalización robusta de fechas existentes y rango en estados_cuenta
+    from server.date_utils import parse_and_normalize_date, compute_date_range
+
+    try:
+        cursor.execute("ALTER TABLE estados_cuenta ADD COLUMN fecha_inicio TEXT DEFAULT ''")
+    except sqlite3.OperationalError:
+        pass
+    try:
+        cursor.execute("ALTER TABLE estados_cuenta ADD COLUMN fecha_fin TEXT DEFAULT ''")
+    except sqlite3.OperationalError:
+        pass
+
+    # Normalizar fechas en tabla movimientos
+    cursor.execute("SELECT id, fecha FROM movimientos")
+    movs = cursor.fetchall()
+    movs_to_update = []
+    for m in movs:
+        old_f = m["fecha"]
+        norm_f = parse_and_normalize_date(old_f)
+        if norm_f and norm_f != old_f:
+            movs_to_update.append((norm_f, m["id"]))
+
+    if movs_to_update:
+        cursor.executemany("UPDATE movimientos SET fecha = ? WHERE id = ?", movs_to_update)
+        print(f"[MIGRATION] Normalizadas {len(movs_to_update)} fechas en movimientos al estándar DD/MM/YYYY")
+
+    # Poblar fecha_inicio y fecha_fin en estados_cuenta
+    cursor.execute("SELECT id FROM estados_cuenta")
+    all_ecs = cursor.fetchall()
+    for ec in all_ecs:
+        ec_id = ec["id"]
+        cursor.execute("SELECT fecha FROM movimientos WHERE estado_cuenta_id = ?", (ec_id,))
+        fechas = [r["fecha"] for r in cursor.fetchall() if r["fecha"]]
+        f_min, f_max, _ = compute_date_range(fechas)
+        cursor.execute("UPDATE estados_cuenta SET fecha_inicio = ?, fecha_fin = ? WHERE id = ?", (f_min, f_max, ec_id))
+
+    print(f"[MIGRATION] Rangos de fechas actualizados para {len(all_ecs)} estados de cuenta.")
+
+    # 9. Índices de alto rendimiento para consultas instantáneas y aceleración de vistas
+    indexes = [
+        "CREATE INDEX IF NOT EXISTS idx_movimientos_condominio ON movimientos(condominio_id)",
+        "CREATE INDEX IF NOT EXISTS idx_movimientos_estado_cuenta ON movimientos(estado_cuenta_id)",
+        "CREATE INDEX IF NOT EXISTS idx_movimientos_ref ON movimientos(referencia)",
+        "CREATE INDEX IF NOT EXISTS idx_movimientos_inm_conf ON movimientos(inmueble_confirmado_id)",
+        "CREATE INDEX IF NOT EXISTS idx_movimientos_inm_sug ON movimientos(inmueble_sugerido_id)",
+        "CREATE INDEX IF NOT EXISTS idx_movimientos_estado_conc ON movimientos(estado_conciliacion)",
+        "CREATE INDEX IF NOT EXISTS idx_estados_cuenta_condo ON estados_cuenta(condominio_id)",
+        "CREATE INDEX IF NOT EXISTS idx_estados_cuenta_carpeta ON estados_cuenta(carpeta_id)",
+        "CREATE INDEX IF NOT EXISTS idx_carpetas_condo ON carpetas(condominio_id)",
+        "CREATE INDEX IF NOT EXISTS idx_inmuebles_condo ON inmuebles(condominio_id)",
+        "CREATE INDEX IF NOT EXISTS idx_tokens_inmueble ON tokens_aprendidos(inmueble_id)",
+        "CREATE INDEX IF NOT EXISTS idx_tokens_tipo_val ON tokens_aprendidos(tipo_token, valor_normalizado)"
+    ]
+    for idx_sql in indexes:
+        cursor.execute(idx_sql)
+    print(f"[INDEXES] Creados {len(indexes)} índices de alto rendimiento en SQLite.")
 
     conn.commit()
     conn.close()

@@ -29,11 +29,16 @@ from server.models import (
     ReportePersonalizadoExport, DownloadUpdateRequest, BancoCreate
 )
 import json
+from server.date_utils import (
+    parse_and_normalize_date, compute_date_range,
+    date_to_sort_key, fix_swapped_dates_in_movements, MESES_ES
+)
 from server.parser_router import detect_bank_and_parse, deduplicate_movements, normalize_ref
 from server.parser_generic import get_table_preview_data, parse_file_with_mapping
 from server.matcher import find_best_match_for_movement, learn_from_confirmation, rescore_pending_movements
 from server.importer import (
     generate_excel_template,
+    generate_conciliacion_template_excel,
     parse_gc_condominio_pdf,
     parse_excel_template,
     save_imported_inmuebles
@@ -317,16 +322,28 @@ def list_inmuebles(condominio_id: int):
     """, (condominio_id,))
     rows = [dict(r) for r in cursor.fetchall()]
 
-    # Adjuntar resumen de datos aprendidos
-    for inm in rows:
-        cursor.execute("""
-            SELECT tipo_token, valor_normalizado, frecuencia_confirmada
+    # Adjuntar resumen de datos aprendidos en lote (optimización O(1) en vez de N+1 queries)
+    inm_ids = [r["id"] for r in rows]
+    tokens_map = {r["id"]: [] for r in rows}
+    if inm_ids:
+        placeholders = ",".join("?" for _ in inm_ids)
+        cursor.execute(f"""
+            SELECT inmueble_id, tipo_token, valor_normalizado, frecuencia_confirmada
             FROM tokens_aprendidos
-            WHERE inmueble_id = ?
+            WHERE inmueble_id IN ({placeholders})
             ORDER BY frecuencia_confirmada DESC
-            LIMIT 10
-        """, (inm["id"],))
-        inm["datos_aprendidos"] = [dict(t) for t in cursor.fetchall()]
+        """, inm_ids)
+        for t in cursor.fetchall():
+            iid = t["inmueble_id"]
+            if len(tokens_map[iid]) < 10:
+                tokens_map[iid].append({
+                    "tipo_token": t["tipo_token"],
+                    "valor_normalizado": t["valor_normalizado"],
+                    "frecuencia_confirmada": t["frecuencia_confirmada"]
+                })
+
+    for inm in rows:
+        inm["datos_aprendidos"] = tokens_map.get(inm["id"], [])
 
     conn.close()
     return rows
@@ -399,6 +416,15 @@ def download_plantilla_excel():
         output,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": "attachment; filename=plantilla_importacion_inmuebles.xlsx"}
+    )
+
+@app.get("/api/conciliacion/plantilla-excel")
+def download_plantilla_conciliacion_excel():
+    output = generate_conciliacion_template_excel()
+    return StreamingResponse(
+        output,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=plantilla_conciliacion_bancaria.xlsx"}
     )
 
 @app.post("/api/condominios/{condominio_id}/inmuebles/importar")
@@ -666,11 +692,12 @@ def _persist_conciliacion(
             "clasificacion_especial": esp
         })
 
+    f_min, f_max, rango_display = compute_date_range([m.get("fecha") for m in todos_guardados if m.get("fecha")])
     cursor.execute("""
         UPDATE estados_cuenta
-        SET total_filas = ?, total_ingresos = ?
+        SET total_filas = ?, total_ingresos = ?, fecha_inicio = ?, fecha_fin = ?
         WHERE id = ?
-    """, (len(todos_guardados), total_ingresos_acumulado, estado_cuenta_id))
+    """, (len(todos_guardados), total_ingresos_acumulado, f_min, f_max, estado_cuenta_id))
 
     conn.commit()
     conn.close()
@@ -888,11 +915,22 @@ def list_carpetas(condominio_id: int):
                ec.id as ec_id, ec.titulo as ec_titulo, ec.nombre_archivo as ec_nombre_archivo,
                ec.formato as ec_formato, ec.banco as ec_banco, ec.total_ingresos as ec_total_ingresos,
                ec.fecha_subida as ec_fecha_subida,
+               ec.fecha_inicio as ec_fecha_inicio, ec.fecha_fin as ec_fecha_fin,
                COUNT(m.id) as total_movimientos,
                COUNT(CASE WHEN m.haber > 0 THEN 1 END) as total_ingresos_filas,
-               COUNT(CASE WHEN m.estado_conciliacion = 'confirmado' AND m.haber > 0 THEN 1 END) as confirmados_count,
-               MIN(m.fecha) as min_fecha,
-               MAX(m.fecha) as max_fecha
+               -- Pagos verdaderamente conciliados/identificados
+               COUNT(CASE WHEN m.estado_conciliacion = 'confirmado' AND m.haber > 0
+                          AND (m.clasificacion_especial IS NULL OR m.clasificacion_especial NOT IN ('No Identificado', 'no_identificado'))
+                     THEN 1 END) as confirmados_count,
+               -- Pagos declarados 'No Identificado'
+               COUNT(CASE WHEN m.haber > 0
+                          AND m.clasificacion_especial IN ('No Identificado', 'no_identificado')
+                     THEN 1 END) as no_identificados_count,
+               -- Pagos pendientes por procesar
+               COUNT(CASE WHEN m.haber > 0
+                          AND (m.estado_conciliacion = 'pendiente' OR m.estado_conciliacion IS NULL)
+                          AND (m.clasificacion_especial IS NULL OR m.clasificacion_especial NOT IN ('No Identificado', 'no_identificado'))
+                     THEN 1 END) as pendientes_count
         FROM carpetas c
         LEFT JOIN estados_cuenta ec ON c.id = ec.carpeta_id
         LEFT JOIN movimientos m ON ec.id = m.estado_cuenta_id
@@ -916,20 +954,41 @@ def list_carpetas(condominio_id: int):
                 "total_ingresos": 0.0,
                 "total_filas": 0,
                 "confirmados_count": 0,
+                "conciliados_count": 0,
+                "no_identificados_count": 0,
+                "pendientes_count": 0,
             }
 
         if r["ec_id"]:
             tot_filas = r["total_ingresos_filas"] if r["total_ingresos_filas"] > 0 else r["total_movimientos"]
             conf = r["confirmados_count"]
+            no_id = r["no_identificados_count"]
+            pend = r["pendientes_count"]
             pct = round((conf / tot_filas * 100), 1) if tot_filas > 0 else 0.0
-            titulo_val = (r["ec_titulo"] or "").strip()
+            pct_no_id = round((no_id / tot_filas * 100), 1) if tot_filas > 0 else 0.0
+
+            # Título automático por rango de fechas (desde el más viejo al más nuevo)
+            f_ini = (r["ec_fecha_inicio"] or "").strip()
+            f_fin = (r["ec_fecha_fin"] or "").strip()
+            if f_ini and f_fin:
+                if f_ini == f_fin:
+                    titulo_rango = f_ini
+                else:
+                    titulo_rango = f"{f_ini} al {f_fin}"
+            elif f_ini:
+                titulo_rango = f_ini
+            else:
+                titulo_rango = r["ec_nombre_archivo"]
+
+            titulo_custom = (r["ec_titulo"] or "").strip()
 
             item_data = {
                 "id": r["ec_id"],
                 "carpeta_id": c_id,
                 "condominio_id": condominio_id,
-                "titulo": r["ec_titulo"] or "",
-                "titulo_display": titulo_val if titulo_val else r["ec_nombre_archivo"],
+                "titulo": titulo_custom,
+                "titulo_rango": titulo_rango,
+                "titulo_display": titulo_rango,
                 "nombre_archivo": r["ec_nombre_archivo"],
                 "formato": r["ec_formato"],
                 "banco": r["ec_banco"],
@@ -938,20 +997,29 @@ def list_carpetas(condominio_id: int):
                 "total_movimientos": r["total_movimientos"],
                 "total_ingresos_filas": r["total_ingresos_filas"],
                 "confirmados_count": conf,
+                "conciliados_count": conf,
+                "no_identificados_count": no_id,
+                "pendientes_count": pend,
                 "porcentaje": pct,
-                "min_fecha": r["min_fecha"],
-                "max_fecha": r["max_fecha"],
+                "pct_no_identificados": pct_no_id,
+                "min_fecha": f_ini,
+                "max_fecha": f_fin,
             }
             carpetas_dict[c_id]["items"].append(item_data)
             carpetas_dict[c_id]["total_ingresos"] += float(r["ec_total_ingresos"] or 0.0)
             carpetas_dict[c_id]["total_filas"] += tot_filas
             carpetas_dict[c_id]["confirmados_count"] += conf
+            carpetas_dict[c_id]["conciliados_count"] += conf
+            carpetas_dict[c_id]["no_identificados_count"] += no_id
+            carpetas_dict[c_id]["pendientes_count"] += pend
 
     resultado = list(carpetas_dict.values())
     for c in resultado:
         t_fil = c["total_filas"]
-        c_conf = c["confirmados_count"]
+        c_conf = c["conciliados_count"]
+        c_no_id = c["no_identificados_count"]
         c["porcentaje"] = round((c_conf / t_fil * 100), 1) if t_fil > 0 else 0.0
+        c["pct_no_identificados"] = round((c_no_id / t_fil * 100), 1) if t_fil > 0 else 0.0
 
     return resultado
 
@@ -1432,12 +1500,13 @@ def get_reporte_movimientos(
     fecha_hasta: Optional[str] = None,
     estado: Optional[str] = "todos",
     carpeta_id: Optional[int] = None,
-    busqueda: Optional[str] = None
+    busqueda: Optional[str] = None,
+    ocultar_negativos: bool = True
 ):
     """
     Consulta consolidada de movimientos para el generador de reportes contables:
     permite filtrar por rango de fechas, estado (ej. solo no identificados/pendientes),
-    carpeta o texto libre.
+    carpeta, texto libre y ocultar saldos negativos por defecto.
     """
     from datetime import datetime
     conn = get_connection()
@@ -1458,6 +1527,9 @@ def get_reporte_movimientos(
         WHERE m.condominio_id = ?
     """
     params = [condominio_id]
+
+    if ocultar_negativos:
+        query += " AND m.haber > 0"
 
     if carpeta_id is not None and carpeta_id > 0:
         query += " AND ec.carpeta_id = ?"
@@ -1496,33 +1568,25 @@ def get_reporte_movimientos(
     rows = cursor.fetchall()
     conn.close()
 
-    def parse_mov_date(d_str):
-        if not d_str:
-            return None
-        d_clean = str(d_str).strip()
-        for fmt in ("%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y", "%d/%m/%y"):
-            try:
-                return datetime.strptime(d_clean, fmt)
-            except ValueError:
-                pass
-        return None
-
-    dt_desde = parse_mov_date(fecha_desde) if fecha_desde else None
-    dt_hasta = parse_mov_date(fecha_hasta) if fecha_hasta else None
+    dt_desde = date_to_sort_key(parse_and_normalize_date(fecha_desde)) if fecha_desde else None
+    dt_hasta = date_to_sort_key(parse_and_normalize_date(fecha_hasta)) if fecha_hasta else None
 
     movimientos_res = []
     total_monto = 0.0
 
     for r in rows:
-        m_dt = parse_mov_date(r["fecha"])
-        if dt_desde and m_dt and m_dt < dt_desde:
+        m_sort = date_to_sort_key(r["fecha"])
+        if dt_desde and m_sort < dt_desde:
             continue
-        if dt_hasta and m_dt and m_dt > dt_hasta:
+        if dt_hasta and m_sort > dt_hasta:
             continue
 
         haber = float(r["haber"] or 0.0)
         debe = float(r["debe"] or 0.0)
         monto = haber if haber > 0 else -debe
+
+        if ocultar_negativos and monto < 0:
+            continue
 
         is_identificado = bool(
             r["inmueble_confirmado"] or

@@ -20,6 +20,7 @@ import pdfplumber
 import openpyxl
 from typing import List, Dict, Any, Optional, Tuple
 from server.parser_bnc import clean_text, parse_amount, extract_metadata_from_description, correlate_comisiones
+from server.date_utils import parse_and_normalize_date, fix_swapped_dates_in_movements
 
 
 # ---------------------------------------------------------------------------
@@ -151,7 +152,8 @@ def _build_movimiento(r: List[str], col_map: Dict[str, int], default_meta: Dict 
             return str(r[idx] or "").strip()
         return fallback
 
-    fecha = get("fecha")
+    fecha_raw = get("fecha")
+    fecha = parse_and_normalize_date(fecha_raw)
     if not _is_date(fecha):
         return None
 
@@ -193,7 +195,7 @@ def _build_movimiento(r: List[str], col_map: Dict[str, int], default_meta: Dict 
 # Parser genérico para PDF (usando pdfplumber — tablas)
 # ---------------------------------------------------------------------------
 
-def parse_generic_pdf(file_bytes: bytes) -> List[Dict[str, Any]]:
+def parse_generic_pdf(file_bytes: bytes, filename: str = "") -> List[Dict[str, Any]]:
     """
     Parser genérico para PDF con tabla(s). Detecta encabezados semánticamente.
     """
@@ -221,6 +223,7 @@ def parse_generic_pdf(file_bytes: bytes) -> List[Dict[str, Any]]:
                     if mov:
                         movimientos.append(mov)
 
+    movimientos = fix_swapped_dates_in_movements(movimientos, filename_hint=filename)
     return correlate_comisiones(movimientos)
 
 
@@ -228,7 +231,7 @@ def parse_generic_pdf(file_bytes: bytes) -> List[Dict[str, Any]]:
 # Parser genérico para texto plano PDF (sin tablas estructuradas)
 # ---------------------------------------------------------------------------
 
-def parse_generic_pdf_text(file_bytes: bytes) -> List[Dict[str, Any]]:
+def parse_generic_pdf_text(file_bytes: bytes, filename: str = "") -> List[Dict[str, Any]]:
     """
     Fallback para PDFs sin tablas: extrae texto línea a línea e intenta
     detectar filas de movimientos por patrones de fecha + monto.
@@ -261,6 +264,7 @@ def parse_generic_pdf_text(file_bytes: bytes) -> List[Dict[str, Any]]:
         if mov:
             movimientos.append(mov)
 
+    movimientos = fix_swapped_dates_in_movements(movimientos, filename_hint=filename)
     return correlate_comisiones(movimientos)
 
 
@@ -306,6 +310,7 @@ def parse_generic_excel_csv(file_bytes: bytes, filename: str) -> List[Dict[str, 
         if mov:
             movimientos.append(mov)
 
+    movimientos = fix_swapped_dates_in_movements(movimientos, filename_hint=filename)
     return correlate_comisiones(movimientos)
 
 
@@ -326,9 +331,9 @@ def parse_generic(file_bytes: bytes, filename: str) -> Tuple[str, List[Dict[str,
         movimientos = parse_generic_excel_csv(file_bytes, filename)
     else:
         # PDF: intentar con tablas primero, luego con texto
-        movimientos = parse_generic_pdf(file_bytes)
+        movimientos = parse_generic_pdf(file_bytes, filename)
         if not movimientos:
-            movimientos = parse_generic_pdf_text(file_bytes)
+            movimientos = parse_generic_pdf_text(file_bytes, filename)
 
     return "Genérico", movimientos
 

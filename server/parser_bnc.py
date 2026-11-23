@@ -3,6 +3,7 @@ import csv
 import io
 import openpyxl
 from typing import List, Dict, Any, Optional
+from server.date_utils import parse_and_normalize_date, fix_swapped_dates_in_movements
 
 def clean_text(text: Optional[str]) -> str:
     if not text:
@@ -198,7 +199,8 @@ def parse_excel_or_csv(file_bytes: bytes, filename: str) -> List[Dict[str, Any]]
     for r in rows[header_idx + 1:]:
         if len(r) <= max(col_map.values(), default=0):
             continue
-        fecha = r[col_map.get("fecha", 0)] if "fecha" in col_map and col_map["fecha"] < len(r) else ""
+        fecha_raw = r[col_map.get("fecha", 0)] if "fecha" in col_map and col_map["fecha"] < len(r) else ""
+        fecha = parse_and_normalize_date(fecha_raw)
         # Verificar que fecha tenga formato fecha básico
         if not re.search(r"\d{1,2}[/-]\d{1,2}[/-]\d{2,4}", fecha):
             continue
@@ -236,9 +238,10 @@ def parse_excel_or_csv(file_bytes: bytes, filename: str) -> List[Dict[str, Any]]
             "inmueble_asignado_historico": inmueble_previo
         })
 
+    movimientos = fix_swapped_dates_in_movements(movimientos, filename_hint=filename)
     return correlate_comisiones(movimientos)
 
-def parse_bnc_pdf(file_bytes: bytes) -> List[Dict[str, Any]]:
+def parse_bnc_pdf(file_bytes: bytes, filename: str = "") -> List[Dict[str, Any]]:
     """
     Parser robusto para estados de cuenta BNC en formato PDF usando pdfplumber.
     Detecta encabezados semánticamente y reutiliza el col_map entre páginas,
@@ -298,7 +301,8 @@ def parse_bnc_pdf(file_bytes: bytes) -> List[Dict[str, Any]]:
         for r in table[start_idx:]:
             if not r:
                 continue
-            fecha = _safe_get(r, col_map.get("fecha", 0))
+            fecha_raw = _safe_get(r, col_map.get("fecha", 0))
+            fecha = parse_and_normalize_date(fecha_raw)
             if not re.search(r"\d{1,2}[/-]\d{1,2}[/-]\d{2,4}", fecha):
                 continue
 
@@ -360,4 +364,5 @@ def parse_bnc_pdf(file_bytes: bytes) -> List[Dict[str, Any]]:
                     # Sin encabezado en esta tabla: usar col_map de página anterior
                     _process_rows(table, global_col_map, 0, movimientos)
 
+    movimientos = fix_swapped_dates_in_movements(movimientos, filename_hint=filename)
     return correlate_comisiones(movimientos)

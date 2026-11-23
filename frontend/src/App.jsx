@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   fetchCondominios,
   createCondominio,
@@ -21,7 +21,15 @@ export default function App() {
   const [selectedCondominio, setSelectedCondominio] = useState(null);
   const [inmuebles, setInmuebles] = useState([]);
   const [activeTab, setActiveTab] = useState("conciliacion"); // 'conciliacion' | 'inmuebles'
+  const [conciliacionVista, setConciliacionVista] = useState("carpetas"); // 'carpetas' | 'conciliando' | 'nueva'
   const [loading, setLoading] = useState(true);
+
+  // Referencia para pausar/volver en conciliación desde el header sticky
+  const volverConciliacionRef = useRef(null);
+
+  const registerVolverCallback = useCallback((fn) => {
+    volverConciliacionRef.current = fn;
+  }, []);
 
   // Tema: 'light' o 'dark' (OLED Black)
   const [theme, setTheme] = useState(() => {
@@ -93,6 +101,7 @@ export default function App() {
   const handleSelectCondominio = (condo) => {
     setSelectedCondominio(condo);
     setActiveTab("conciliacion");
+    setConciliacionVista("carpetas");
     loadInmuebles(condo.id);
   };
 
@@ -161,38 +170,106 @@ export default function App() {
             justifyContent: "space-between",
           }}
         >
-          {/* Logo y Botón de Volver al Selector */}
-          <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-            <button
-              type="button"
-              onClick={() => setSelectedCondominio(null)}
-              title="Cambiar de condominio"
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "6px",
-                padding: "6px 10px",
-                borderRadius: "8px",
-                border: "1px solid rgba(0, 0, 0, 0.08)",
-                background: "rgba(0, 0, 0, 0.02)",
-                color: "rgba(20, 20, 19, 0.7)",
-                fontSize: "12.5px",
-                fontWeight: 500,
-                cursor: "pointer",
-                transition: "all 0.15s ease",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = "rgba(0, 0, 0, 0.05)";
-                e.currentTarget.style.color = "#111110";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = "rgba(0, 0, 0, 0.02)";
-                e.currentTarget.style.color = "rgba(20, 20, 19, 0.7)";
-              }}
-            >
-              <ChevronLeft size={15} />
-              <span>Condominios</span>
-            </button>
+          {/* Logo y Botón de Volver al Selector / Volver a Carpetas */}
+          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            {activeTab === "conciliacion" && conciliacionVista !== "carpetas" ? (
+              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (volverConciliacionRef.current) {
+                      volverConciliacionRef.current();
+                    } else {
+                      setConciliacionVista("carpetas");
+                    }
+                  }}
+                  title="Volver a la lista de conciliaciones y carpetas"
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    padding: "6px 11px",
+                    borderRadius: "8px",
+                    border: "1px solid rgba(16, 185, 129, 0.4)",
+                    background: "rgba(16, 185, 129, 0.08)",
+                    color: "#059669",
+                    fontSize: "12.5px",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    transition: "all 0.15s ease",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = "rgba(16, 185, 129, 0.16)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "rgba(16, 185, 129, 0.08)";
+                  }}
+                >
+                  <ChevronLeft size={15} />
+                  <span>Volver a Conciliaciones</span>
+                </button>
+
+                <span style={{ color: "rgba(20, 20, 19, 0.25)", fontSize: "12px" }}>/</span>
+
+                <button
+                  type="button"
+                  onClick={() => setSelectedCondominio(null)}
+                  title="Salir a la lista general de condominios"
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    padding: "6px 8px",
+                    borderRadius: "6px",
+                    border: "none",
+                    background: "transparent",
+                    color: "rgba(20, 20, 19, 0.5)",
+                    fontSize: "12px",
+                    fontWeight: 500,
+                    cursor: "pointer",
+                    transition: "color 0.15s ease",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.color = "#111110";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.color = "rgba(20, 20, 19, 0.5)";
+                  }}
+                >
+                  <span>Condominios</span>
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setSelectedCondominio(null)}
+                title="Cambiar de condominio"
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  padding: "6px 10px",
+                  borderRadius: "8px",
+                  border: "1px solid rgba(0, 0, 0, 0.08)",
+                  background: "rgba(0, 0, 0, 0.02)",
+                  color: "rgba(20, 20, 19, 0.7)",
+                  fontSize: "12.5px",
+                  fontWeight: 500,
+                  cursor: "pointer",
+                  transition: "all 0.15s ease",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "rgba(0, 0, 0, 0.05)";
+                  e.currentTarget.style.color = "#111110";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "rgba(0, 0, 0, 0.02)";
+                  e.currentTarget.style.color = "rgba(20, 20, 19, 0.7)";
+                }}
+              >
+                <ChevronLeft size={15} />
+                <span>Condominios</span>
+              </button>
+            )}
 
             <div style={{ height: "20px", width: "1px", background: "rgba(0, 0, 0, 0.1)" }} />
 
@@ -304,6 +381,8 @@ export default function App() {
             condominio={selectedCondominio}
             inmuebles={inmuebles}
             onRefreshInmuebles={() => loadInmuebles(selectedCondominio.id)}
+            onVistaChange={setConciliacionVista}
+            registerVolverCallback={registerVolverCallback}
           />
         ) : (
           <InmueblesManager

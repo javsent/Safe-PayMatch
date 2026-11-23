@@ -39,6 +39,10 @@ def get_connection():
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON;")
     conn.execute("PRAGMA journal_mode = WAL;")
+    conn.execute("PRAGMA synchronous = NORMAL;")
+    conn.execute("PRAGMA cache_size = -64000;")  # 64 MB de caché en RAM para lecturas ultra-rápidas
+    conn.execute("PRAGMA temp_store = MEMORY;")   # Operaciones temporales en RAM
+    conn.execute("PRAGMA mmap_size = 268435456;") # 256 MB memory-mapped I/O
     return conn
 
 def init_db():
@@ -142,13 +146,21 @@ def init_db():
     );
     """)
 
-    # Migración defensiva: asegurar columna titulo y carpeta_id si la tabla ya existía
+    # Migración defensiva: asegurar columna titulo, carpeta_id, fecha_inicio y fecha_fin si la tabla ya existía
     try:
         cursor.execute("ALTER TABLE estados_cuenta ADD COLUMN titulo TEXT DEFAULT ''")
     except sqlite3.OperationalError:
         pass
     try:
         cursor.execute("ALTER TABLE estados_cuenta ADD COLUMN carpeta_id INTEGER REFERENCES carpetas(id) ON DELETE SET NULL")
+    except sqlite3.OperationalError:
+        pass
+    try:
+        cursor.execute("ALTER TABLE estados_cuenta ADD COLUMN fecha_inicio TEXT DEFAULT ''")
+    except sqlite3.OperationalError:
+        pass
+    try:
+        cursor.execute("ALTER TABLE estados_cuenta ADD COLUMN fecha_fin TEXT DEFAULT ''")
     except sqlite3.OperationalError:
         pass
 
@@ -205,6 +217,24 @@ def init_db():
         WHERE inmueble_confirmado_id IS NOT NULL
           AND clasificacion_especial IN ('No Identificado', 'no_identificado')
     ''')
+
+    # Índices de alto rendimiento para consultas instantáneas y navegación sin lag
+    indexes = [
+        "CREATE INDEX IF NOT EXISTS idx_movimientos_condominio ON movimientos(condominio_id)",
+        "CREATE INDEX IF NOT EXISTS idx_movimientos_estado_cuenta ON movimientos(estado_cuenta_id)",
+        "CREATE INDEX IF NOT EXISTS idx_movimientos_ref ON movimientos(referencia)",
+        "CREATE INDEX IF NOT EXISTS idx_movimientos_inm_conf ON movimientos(inmueble_confirmado_id)",
+        "CREATE INDEX IF NOT EXISTS idx_movimientos_inm_sug ON movimientos(inmueble_sugerido_id)",
+        "CREATE INDEX IF NOT EXISTS idx_movimientos_estado_conc ON movimientos(estado_conciliacion)",
+        "CREATE INDEX IF NOT EXISTS idx_estados_cuenta_condo ON estados_cuenta(condominio_id)",
+        "CREATE INDEX IF NOT EXISTS idx_estados_cuenta_carpeta ON estados_cuenta(carpeta_id)",
+        "CREATE INDEX IF NOT EXISTS idx_carpetas_condo ON carpetas(condominio_id)",
+        "CREATE INDEX IF NOT EXISTS idx_inmuebles_condo ON inmuebles(condominio_id)",
+        "CREATE INDEX IF NOT EXISTS idx_tokens_inmueble ON tokens_aprendidos(inmueble_id)",
+        "CREATE INDEX IF NOT EXISTS idx_tokens_tipo_val ON tokens_aprendidos(tipo_token, valor_normalizado)"
+    ]
+    for idx_sql in indexes:
+        cursor.execute(idx_sql)
 
     conn.commit()
     conn.close()

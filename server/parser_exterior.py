@@ -5,6 +5,7 @@ import pdfplumber
 from datetime import datetime
 from typing import List, Dict, Any
 from server.parser_bnc import clean_text, parse_amount
+from server.date_utils import parse_and_normalize_date
 
 def parse_exterior_pdf(file_bytes: bytes) -> List[Dict[str, Any]]:
     """
@@ -90,11 +91,7 @@ def parse_exterior_text_and_annots(doc: pymupdf.Document) -> List[Dict[str, Any]
                 continue
 
             desc_part = " ".join(tokens[:date_idx])
-            fecha_part = tokens[date_idx]
-
-            parts_date = fecha_part.split("/")
-            if len(parts_date) == 3 and len(parts_date[2]) == 2:
-                fecha_part = f"{parts_date[0].zfill(2)}/{parts_date[1].zfill(2)}/20{parts_date[2]}"
+            fecha_part = parse_and_normalize_date(tokens[date_idx])
 
             ref_part = tokens[date_idx + 1] if date_idx + 1 < len(tokens) else ""
 
@@ -206,7 +203,7 @@ def parse_exterior_official_pdfplumber(file_bytes: bytes) -> List[Dict[str, Any]
                         if not dia_val.isdigit() or len(dia_val) > 2:
                             continue
 
-                        fecha = f"{dia_val.zfill(2)}/{mes_ano}"
+                        fecha = parse_and_normalize_date(f"{dia_val.zfill(2)}/{mes_ano}")
                         ref = clean_text(r[col_map.get("referencia", 2)])
                         desc = clean_text(r[col_map.get("descripcion", 3)])
                         cargos = parse_amount(r[col_map.get("cargos", 5)]) if "cargos" in col_map else 0.0

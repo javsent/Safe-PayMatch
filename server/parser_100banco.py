@@ -4,6 +4,7 @@ import pymupdf
 import pdfplumber
 from typing import List, Dict, Any
 from server.parser_bnc import clean_text, parse_amount
+from server.date_utils import parse_and_normalize_date
 
 # Mapa de códigos bancarios comunes en Venezuela para identificar banco emisor
 CODIGOS_BANCOS = {
@@ -149,14 +150,7 @@ def parse_100banco_pdf(file_bytes: bytes) -> List[Dict[str, Any]]:
                             continue
 
                         # Formatear fecha a DD/MM/YYYY
-                        p_date = fecha_raw.split("/")
-                        if len(p_date) == 3:
-                            yyyy = p_date[2]
-                            if len(yyyy) == 2:
-                                yyyy = f"20{yyyy}"
-                            fecha_norm = f"{p_date[0].zfill(2)}/{p_date[1].zfill(2)}/{yyyy}"
-                        else:
-                            fecha_norm = fecha_raw
+                        fecha_norm = parse_and_normalize_date(fecha_raw)
 
                         # Limpiar y analizar descripción y referencias
                         clean_desc = clean_text(desc_raw)

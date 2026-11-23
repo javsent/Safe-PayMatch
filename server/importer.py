@@ -67,6 +67,108 @@ def generate_excel_template() -> io.BytesIO:
     output.seek(0)
     return output
 
+
+def generate_conciliacion_template_excel() -> io.BytesIO:
+    """
+    Genera un archivo XLSX formateado profesionalmente para que el usuario pueda
+    completar a mano transacciones bancarias en caso de extractos no reconocidos.
+    """
+    wb = openpyxl.Workbook()
+
+    # Hoja 1: Movimientos Bancarios
+    ws = wb.active
+    ws.title = "Movimientos Bancarios"
+
+    headers = [
+        "Fecha",
+        "Referencia",
+        "Descripción",
+        "Haber",
+        "Debe",
+        "Apartamento"
+    ]
+
+    header_fill = PatternFill(start_color="111110", end_color="111110", fill_type="solid")
+    header_font = Font(name="Segoe UI", size=11, bold=True, color="FFFFFF")
+    thin_border = Border(
+        left=Side(style='thin', color='E5E5E5'),
+        right=Side(style='thin', color='E5E5E5'),
+        top=Side(style='thin', color='E5E5E5'),
+        bottom=Side(style='thin', color='E5E5E5')
+    )
+
+    for col_idx, col_name in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col_idx, value=col_name)
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+
+    ejemplos = [
+        ["04/11/2026", "08472910", "PAGO MOVIL V-12345678 CARLOS PEREZ 04141234567", 1450.50, 0.00, "01-A"],
+        ["05/11/2026", "19384721", "TRANSFERENCIA RECIBIDA BCO MERCANTIL MARIA ROJAS", 2800.00, 0.00, "03-C"],
+        ["06/11/2026", "44892015", "PAGO MOVIL DE SANDRA GUEDEZ ABONO CONDOMINIO", 950.00, 0.00, "02-B"],
+        ["06/11/2026", "00000000", "COMISION POR TRANSFERENCIA INTERBANCARIA", 0.00, 7.25, ""],
+    ]
+
+    data_font = Font(name="Segoe UI", size=10, color="262626")
+    for row_idx, row_data in enumerate(ejemplos, 2):
+        for col_idx, val in enumerate(row_data, 1):
+            cell = ws.cell(row=row_idx, column=col_idx, value=val)
+            cell.font = data_font
+            cell.border = thin_border
+            if col_idx == 1:
+                cell.alignment = Alignment(horizontal="center", vertical="center")
+                cell.number_format = "@"
+            elif col_idx == 2:
+                cell.alignment = Alignment(horizontal="center", vertical="center")
+                cell.number_format = "@"
+            elif col_idx in (4, 5):
+                cell.alignment = Alignment(horizontal="right", vertical="center")
+                cell.number_format = "#,##0.00"
+            elif col_idx == 6:
+                cell.alignment = Alignment(horizontal="center", vertical="center")
+            else:
+                cell.alignment = Alignment(horizontal="left", vertical="center")
+
+    col_widths = [16, 20, 52, 18, 16, 18]
+    for idx, width in enumerate(col_widths, 1):
+        ws.column_dimensions[openpyxl.utils.get_column_letter(idx)].width = width
+
+    ws.row_dimensions[1].height = 28
+    for r in range(2, len(ejemplos) + 2):
+        ws.row_dimensions[r].height = 22
+
+    # Hoja 2: Instrucciones de uso
+    ws_inst = wb.create_sheet(title="Instrucciones")
+    ws_inst.column_dimensions["A"].width = 6
+    ws_inst.column_dimensions["B"].width = 75
+
+    title_font = Font(name="Segoe UI", size=13, bold=True, color="111110")
+    inst_font = Font(name="Segoe UI", size=10.5, color="333333")
+    bold_inst_font = Font(name="Segoe UI", size=10.5, bold=True, color="111110")
+
+    ws_inst.cell(row=2, column=2, value="Instrucciones de Uso - Plantilla de Conciliación Safe-PayMatch").font = title_font
+
+    instrucciones = [
+        "1. Puedes borrar las filas de ejemplo y rellenar la tabla con tus transacciones bancarias.",
+        "2. Columna 'Fecha': Escribe la fecha en formato Día/Mes/Año (ej: 04/11/2026).",
+        "3. Columna 'Referencia': Número de confirmación o recibo de la transferencia/pago móvil.",
+        "4. Columna 'Descripción': Escribe el concepto, nombre del titular, cédula (ej: V-12345678) o teléfono para que la IA sugiera el apartamento automáticamente.",
+        "5. Columna 'Haber': Monto del pago recibido (ingreso).",
+        "6. Columna 'Debe': Opcional, para cargos o comisiones bancarias (egresos).",
+        "7. Columna 'Apartamento': Opcional. Si ya conoces el apartamento (ej: 04-B), puedes colocarlo directamente.",
+        "8. Guarda el archivo en formato .xlsx y súbelo en el botón 'Seleccionar Archivo(s)' de Safe-PayMatch."
+    ]
+
+    for idx, text in enumerate(instrucciones, 4):
+        c = ws_inst.cell(row=idx, column=2, value=text)
+        c.font = inst_font
+
+    output = io.BytesIO()
+    wb.save(output)
+    output.seek(0)
+    return output
+
 def parse_gc_middle_fields(raw_text: str) -> Tuple[str, str]:
     """
     Analiza inteligentemente las columnas intermedias (RFC, CURP, Teléfonos) del reporte GC.

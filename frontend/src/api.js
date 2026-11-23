@@ -71,6 +71,10 @@ export function getPlantillaExcelUrl() {
   return `${API_BASE}/inmuebles/plantilla-excel`;
 }
 
+export function getPlantillaConciliacionExcelUrl() {
+  return `${API_BASE}/conciliacion/plantilla-excel`;
+}
+
 export async function importarInmuebles(condominioId, file, tipoImportacion = "auto") {
   const formData = new FormData();
   formData.append("file", file);
@@ -320,6 +324,7 @@ export async function fetchReporteMovimientos(condominioId, filters = {}) {
   if (filters.estado) params.append("estado", filters.estado);
   if (filters.carpetaId) params.append("carpeta_id", filters.carpetaId);
   if (filters.busqueda) params.append("busqueda", filters.busqueda);
+  if (filters.ocultarNegativos !== undefined) params.append("ocultar_negativos", String(filters.ocultarNegativos));
 
   const res = await fetch(`${API_BASE}/condominios/${condominioId}/reporte-movimientos?${params.toString()}`);
   if (!res.ok) {

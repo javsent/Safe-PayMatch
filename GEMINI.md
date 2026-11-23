@@ -34,6 +34,50 @@
 - **Acceso rápido y gestión:** Los bancos guardados aparecen directamente en el selector con el prefijo `🏦 [Nombre] (Guardado)` e incluyen un botón 🗑️ para eliminarlos de la lista.
 - **Compatibilidad con parsers y mapeo:** Se integra automáticamente con el parser genérico y con el modal interactivo de mapeo de columnas para preservar el nombre del banco en la conciliación.
 
+### 📅 Titulación Automática por Rango de Fechas y Subtítulo de Archivo (COMPLETADO v1.4.0)
+- **Rango cronológico en títulos:** Cada extracto en la lista de conciliaciones muestra automáticamente como título principal el rango de fechas real de sus pagos ordenados de más antiguo a más reciente (ej. *02/11/2026 al 06/11/2026*, o *23/11/2026* si es un solo día).
+- **Subtítulo descriptivo con contexto de usuario:** Muestra de forma limpia el nombre del archivo original subido (`.xlsx`, `.pdf`) o la nota personalizada del usuario para conservar todo el contexto sin saturar la vista.
+- **Columnas persistentes en SQLite:** `fecha_inicio` y `fecha_fin` en `estados_cuenta` calculadas con precisión cronológica (año, mes, día).
+
+### ⚖️ Discriminación Contable de Pagos "No Identificado" (COMPLETADO v1.4.0)
+- **Separación de métricas de conciliación:** Los pagos marcados como "No Identificado" ya no se cuentan falsamente como conciliados.
+- **Desglose exacto en lista y carpeta:** Muestra claramente *X / Total conciliados* y desglosa en ámbar *• Y no identificados*.
+- **Barra de progreso visual bicolor:** Segmento verde para pagos conciliados identificados y segmento ámbar para pagos no identificados.
+
+### 🚫 Filtro Inteligente de Saldos Negativos en Reportes (COMPLETADO v1.4.0)
+- **Ocultar saldos negativos por defecto:** En el modal del generador de reportes contables (`ReporteGeneralModal.jsx`), los débitos bancarios, comisiones y egresos vienen automáticamente ocultos para evitar eliminarlos manualmente uno por uno.
+- **Control interactivo visible:** Switch/checkbox para alternar con un clic entre ver solo ingresos o incluir todos los movimientos bancarios.
+
+### 🧭 Normalización y Detección Robusta de Fechas Bancarias (COMPLETADO v1.4.0)
+- **Módulo centralizado `server/date_utils.py`:** Convención estándar bancaria hispana/venezolana `DD/MM/YYYY` por defecto (`dayfirst=True`).
+- **Desambiguación inteligente a nivel de lote:** Si un extracto contiene fechas como `15/11/2026` o `23/11/2026`, el sistema deduce con certeza absoluta que el archivo es del mes 11 (Noviembre) y corrige automáticamente celdas ambiguas o invertidas por Excel (ej. `4/11/2026` interpretado erróneamente por configuraciones regionales en inglés como 11 de abril).
+- **Limpieza de metadatos de hora y multilínea:** Elimina automáticamente residuos de marcas de tiempo (`00:00:00`, `12:56PM`, saltos de línea de PDF/Excel).
+
+### 🛡️ Confirmación con Botón "Aceptar" al Asignar Apartamento (COMPLETADO v1.4.0)
+- **Prevención de asignaciones accidentales:** Al seleccionar una opción en el menú desplegable de apartamentos, el sistema ya no guarda automáticamente.
+- **Flujo seguro y compacto (v1.4.1):** Mantiene la selección con borde verde suave de previsualización. La columna se amplió a 220px y el control inline se compactó a un botón iconográfico `[ ✓ ]` (28px) y cancelar `[ ✕ ]`, permitiendo que el nombre del apartamento permanezca 100% visible y legible en el menú desplegable. Permite rectificar o cancelar antes de guardar.
+
+### 📥 Plantilla Oficial de Conciliación Bancaria en Excel (.xlsx) (COMPLETADO v1.4.0)
+- **Botón de descarga en "Nueva Conciliación":** En la zona de subida de extractos contables se incorporó el botón verde esmeralda *"📥 Descargar plantilla Excel (.xlsx) para rellenar manualmente"*.
+- **Estructura 100% compatible:** Contiene las columnas esenciales (`Fecha`, `Referencia`, `Descripción`, `Haber`, `Debe`, `Apartamento`) con formatos numéricos preconfigurados (`#,##0.00`) y formato de texto para preservar ceros a la izquierda en referencias.
+- **Hoja de instrucciones integrada:** Incluye guía clara paso a paso para el usuario y ejemplos con formatos venezolanos listos para ser procesados sin errores por el parser automático.
+
+### ⚡ Optimización Integral de Rendimiento, Desplazamiento y Base de Datos (COMPLETADO v1.4.1)
+- **12 Índices de alta velocidad en SQLite:** Creados en `movimientos`, `estados_cuenta`, `carpetas`, `inmuebles` y `tokens_aprendidos` (`condominio_id`, `estado_cuenta_id`, `referencia`, `inmueble_confirmado_id`, `carpeta_id`, etc.), eliminando escaneos completos de tablas.
+- **Pragmas SQLite de memoria:** Activación de caché en RAM de 64MB (`cache_size = -64000`), `synchronous = NORMAL`, `temp_store = MEMORY` y memoria mapeada de 256MB (`mmap_size = 268435456`) en `server/database.py`.
+- **Eliminación del problema N+1 en inmuebles:** `list_inmuebles` ahora recupera los tokens aprendidos de todo el condominio en una única consulta agrupada por IDs en vez de ejecutar una consulta SQL individual por cada apartamento.
+- **Virtualización CSS de renderizado (`content-visibility: auto`):** Aplicada a las filas `<tr>` de movimientos bancarios para que Chromium/WebView2 difiera el diseño y pintado de filas fuera de pantalla, logrando un desplazamiento fluido a 60fps sin tirones.
+- **Memoización de componentes y métricas React:**
+  - `inmueblesOptions`: El listado de opciones del selector de inmuebles se calcula una sola vez con `useMemo`, eliminando la creación de decenas de miles de nodos DOM en cada render.
+  - Métricas agregadas (`totalHaber`, `totalConfirmados`, `totalNoIdentificados`, `pctConciliado`, etc.) unificadas en un único recorrido O(N) memoizado en `ConciliacionPanel.jsx`.
+  - Agrupación por meses (`gruposPorMes`) memoizada.
+
+### 🧭 Navegación Contextual e Inteligente en Header Sticky (COMPLETADO v1.4.1)
+- **Botón contextual por nivel jerárquico:** Cuando el usuario se encuentra dentro de una conciliación o subiendo un nuevo extracto y se desplaza hacia abajo por las filas de movimientos, el botón anclado en la cabecera superior fija (*sticky header*) se transforma automáticamente en `[ < Volver a Conciliaciones ]` con acento visual esmeralda suave.
+- **Guardado y pausa automática:** Al hacer clic en este botón, guarda el estado actual, titulación y pausa la conciliación de forma segura, regresando directamente a la vista de carpetas y extractos del condominio actual sin salirse de él.
+- **Acceso directo secundario (`/ Condominios`):** Mantiene un enlace discreto al lado para los casos en que el usuario sí desee salir directamente al selector general de condominios con un solo clic.
+- **Alineación de barra de búsqueda según mejores prácticas UI:** El buscador de movimientos se reubicó al extremo derecho de la barra de herramientas junto a las acciones por lote, dejando las píldoras de filtrado a la izquierda sin espacios vacíos extraños en el centro, e incluyendo botón de borrado rápido (`✕`).
+
 ---
 
 ## 📌 POLÍTICA OBLIGATORIA DE CONTROL DE VERSIONES (SemVer)

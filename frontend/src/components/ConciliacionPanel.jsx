@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
   UploadCloud,
   CheckCircle2,
@@ -30,6 +30,8 @@ import {
   X,
   SlidersHorizontal,
   Copy,
+  RotateCcw,
+  FileSpreadsheet,
 } from "lucide-react";
 import DuplicadosModal from "./DuplicadosModal";
 import SuggestionTooltip from "./Tooltip";
@@ -42,6 +44,7 @@ import {
   getExportUrl,
   getExportExcelUrl,
   getExportPdfUrl,
+  getPlantillaConciliacionExcelUrl,
   fetchEstadosCuenta,
   fetchEstadoCuenta,
   updateEstadoCuentaTitulo,
@@ -63,9 +66,20 @@ export default function ConciliacionPanel({
   condominio,
   inmuebles,
   onRefreshInmuebles,
+  onVistaChange,
+  registerVolverCallback,
 }) {
   // Estados de Navegación y Vistas: 'carpetas' | 'conciliando' | 'nueva'
   const [vista, setVista] = useState("carpetas");
+
+  // Notificar vista activa al contenedor principal para sincronizar el header sticky
+  useEffect(() => {
+    onVistaChange?.(vista);
+    return () => {
+      onVistaChange?.("carpetas");
+    };
+  }, [vista, onVistaChange]);
+
   const [carpetas, setCarpetas] = useState([]);
   const [loadingCarpetas, setLoadingCarpetas] = useState(false);
   const [carpetasColapsadas, setCarpetasColapsadas] = useState({});
@@ -158,6 +172,7 @@ export default function ConciliacionPanel({
   const [modalColumnMapper, setModalColumnMapper] = useState({ open: false, file: null });
   const [modalReporteGeneral, setModalReporteGeneral] = useState(false);
   const [modalDuplicados, setModalDuplicados] = useState(false);
+  const [seleccionesInmuebles, setSeleccionesInmuebles] = useState({});
 
   // Cargar lista de carpetas al seleccionar o cambiar de condominio
   useEffect(() => {
@@ -285,6 +300,7 @@ export default function ConciliacionPanel({
       const data = await fetchEstadoCuenta(estadoCuentaId);
       setEstadoCuenta(data);
       setMovimientos(data.movimientos || []);
+      setSeleccionesInmuebles({});
       setTituloTemp(data.titulo || data.nombre_archivo || "");
       setVista("conciliando");
     } catch (err) {
@@ -315,6 +331,19 @@ export default function ConciliacionPanel({
     loadCarpetas(condominio.id);
     showNotice("Conciliación guardada y pausada. Puedes continuar en cualquier momento.");
   };
+
+  // Registrar función de retorno para que el header sticky la invoque al hacer clic
+  useEffect(() => {
+    if (registerVolverCallback) {
+      registerVolverCallback(() => {
+        if (vista === "conciliando") {
+          handlePausarYGuardar();
+        } else if (vista === "nueva") {
+          setVista("carpetas");
+        }
+      });
+    }
+  }, [registerVolverCallback, vista, editandoTitulo, tituloTemp, condominio?.id]);
 
   const handleDelete = async (e, id, nombre) => {
     e.stopPropagation();
@@ -521,6 +550,41 @@ export default function ConciliacionPanel({
     }
   };
 
+  const handleConfirmarSeleccion = async (mov, overrideVal = null) => {
+    const rawVal = overrideVal !== null
+      ? overrideVal
+      : (seleccionesInmuebles[mov.id] !== undefined ? seleccionesInmuebles[mov.id] : (mov.inmueble_confirmado_id || mov.inmueble_sugerido_id || ""));
+
+    if (!rawVal) {
+      alert("Selecciona un apartamento, 'No Aplica' o 'No Identificado' antes de aceptar.");
+      return;
+    }
+
+    if (rawVal === "no_aplica") {
+      await handleConfirmRow(mov, null, mov.clasificacion_especial === "No Identificado" ? "No Aplica" : (mov.clasificacion_especial || "No Aplica"));
+    } else if (rawVal === "no_identificado") {
+      await handleConfirmRow(mov, null, "No Identificado");
+    } else {
+      const cleanEsp = (mov.clasificacion_especial === "No Identificado" || mov.clasificacion_especial === "No Aplica") ? "" : (mov.clasificacion_especial || "");
+      await handleConfirmRow(mov, parseInt(rawVal), cleanEsp);
+    }
+
+    // Limpiar selección manual pendiente de esta fila
+    setSeleccionesInmuebles((prev) => {
+      const next = { ...prev };
+      delete next[mov.id];
+      return next;
+    });
+  };
+
+  const handleCancelarSeleccion = (movId) => {
+    setSeleccionesInmuebles((prev) => {
+      const next = { ...prev };
+      delete next[movId];
+      return next;
+    });
+  };
+
   const handleBatchConfirmHighConfidence = async () => {
     const candidates = movimientos.filter(
       (m) =>
@@ -585,59 +649,119 @@ export default function ConciliacionPanel({
     }
   };
 
-  // Filtrado de movimientos para la tabla
-  const filteredMovs = movimientos.filter((m) => {
-    if (filtroTipo === "ingresos" && m.haber <= 0) return false;
-    if (filtroTipo === "pendientes" && (m.estado_conciliacion === "confirmado" || m.haber <= 0))
-      return false;
-    if (filtroTipo === "confirmados" && m.estado_conciliacion !== "confirmado") return false;
+  // Memoización de opciones de inmuebles (evita instanciar miles de <option> en cada fila por render)
+  const inmueblesOptions = useMemo(() => {
+    return (inmuebles || []).map((inm) => (
+      <option key={inm.id} value={String(inm.id)}>
+        {inm.identificador} - {inm.propietario}
+      </option>
+    ));
+  }, [inmuebles]);
 
-    if (searchTerm.trim()) {
-      const q = searchTerm.toLowerCase();
-      const matchDesc = (m.descripcion || "").toLowerCase().includes(q);
-      const matchRef = (m.referencia || "").toLowerCase().includes(q);
-      const matchInm =
-        (m.inmueble_sugerido_identificador &&
-          m.inmueble_sugerido_identificador.toLowerCase().includes(q)) ||
-        (m.inmueble_confirmado_identificador &&
-          m.inmueble_confirmado_identificador.toLowerCase().includes(q));
-      return matchDesc || matchRef || matchInm;
+  // Filtrado de movimientos para la tabla memoizado
+  const filteredMovs = useMemo(() => {
+    return movimientos.filter((m) => {
+      if (filtroTipo === "ingresos" && m.haber <= 0) return false;
+      if (filtroTipo === "pendientes" && (m.estado_conciliacion === "confirmado" || m.haber <= 0))
+        return false;
+      if (filtroTipo === "confirmados" && m.estado_conciliacion !== "confirmado") return false;
+
+      if (searchTerm.trim()) {
+        const q = searchTerm.toLowerCase();
+        const matchDesc = (m.descripcion || "").toLowerCase().includes(q);
+        const matchRef = (m.referencia || "").toLowerCase().includes(q);
+        const matchInm =
+          (m.inmueble_sugerido_identificador &&
+            m.inmueble_sugerido_identificador.toLowerCase().includes(q)) ||
+          (m.inmueble_confirmado_identificador &&
+            m.inmueble_confirmado_identificador.toLowerCase().includes(q));
+        return matchDesc || matchRef || matchInm;
+      }
+      return true;
+    });
+  }, [movimientos, filtroTipo, searchTerm]);
+
+  // Métricas agregadas memoizadas en una sola pasada O(N)
+  const {
+    totalHaber,
+    totalConfirmados,
+    totalNoIdentificados,
+    totalIngresos,
+    pctConciliado,
+    pctNoIdentificados,
+    highConfidencePending,
+  } = useMemo(() => {
+    let haber = 0;
+    let conf = 0;
+    let noId = 0;
+    let ing = 0;
+    let highConf = 0;
+
+    for (const m of movimientos) {
+      const h = m.haber || 0;
+      haber += h;
+      if (h > 0) {
+        ing++;
+        const isConf = m.estado_conciliacion === "confirmado";
+        const isNoId =
+          m.clasificacion_especial === "No Identificado" ||
+          m.clasificacion_especial === "no_identificado" ||
+          m.inmueble_confirmado_identificador === "No Identificado";
+
+        if (isConf && !isNoId) {
+          conf++;
+        } else if (isNoId) {
+          noId++;
+        }
+
+        if (m.estado_conciliacion === "pendiente" && (m.score_confianza || 0) >= 70) {
+          highConf++;
+        }
+      }
     }
-    return true;
-  });
 
-  const totalHaber = movimientos.reduce((acc, m) => acc + (m.haber || 0), 0);
-  const totalConfirmados = movimientos.filter((m) => m.estado_conciliacion === "confirmado" && m.haber > 0).length;
-  const totalIngresos = movimientos.filter((m) => m.haber > 0).length;
-  const pctConciliado = totalIngresos > 0 ? Math.round((totalConfirmados / totalIngresos) * 100) : 0;
-  const highConfidencePending = movimientos.filter(
-    (m) => m.estado_conciliacion === "pendiente" && m.haber > 0 && m.score_confianza >= 70
-  ).length;
+    const pctC = ing > 0 ? Math.round((conf / ing) * 100) : 0;
+    const pctN = ing > 0 ? Math.round((noId / ing) * 100) : 0;
+
+    return {
+      totalHaber: haber,
+      totalConfirmados: conf,
+      totalNoIdentificados: noId,
+      totalIngresos: ing,
+      pctConciliado: pctC,
+      pctNoIdentificados: pctN,
+      highConfidencePending: highConf,
+    };
+  }, [movimientos]);
 
   const formatCurrency = (val) =>
     Number(val || 0).toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-  // Agrupamiento dinámico de conciliaciones por Mes/Año (solo los meses que existen)
-  const gruposPorMes = carpetas.reduce((acc, ec) => {
-    const key = ec.mes_key || "otros";
-    if (!acc[key]) {
-      acc[key] = {
-        label: ec.mes_label || "Otras Conciliaciones",
-        items: [],
-        totalIngresos: 0,
-        totalFilas: 0,
-        confirmadosCount: 0,
-      };
-    }
-    acc[key].items.push(ec);
-    acc[key].totalIngresos += Number(ec.total_ingresos || 0);
-    acc[key].totalFilas += Number(ec.total_ingresos_filas || ec.total_movimientos || 0);
-    acc[key].confirmadosCount += Number(ec.confirmados_count || 0);
-    return acc;
-  }, {});
+  // Agrupamiento dinámico de conciliaciones por Mes/Año (solo los meses que existen) memoizado
+  const gruposPorMes = useMemo(() => {
+    return carpetas.reduce((acc, ec) => {
+      const key = ec.mes_key || "otros";
+      if (!acc[key]) {
+        acc[key] = {
+          label: ec.mes_label || "Otras Conciliaciones",
+          items: [],
+          totalIngresos: 0,
+          totalFilas: 0,
+          confirmadosCount: 0,
+        };
+      }
+      acc[key].items.push(ec);
+      acc[key].totalIngresos += Number(ec.total_ingresos || 0);
+      acc[key].totalFilas += Number(ec.total_ingresos_filas || ec.total_movimientos || 0);
+      acc[key].confirmadosCount += Number(ec.confirmados_count || 0);
+      return acc;
+    }, {});
+  }, [carpetas]);
 
-  // Ordenar meses cronológicamente descendente
-  const keysMesesOrdenados = Object.keys(gruposPorMes).sort((a, b) => b.localeCompare(a));
+  // Ordenar meses cronológicamente descendente memoizado
+  const keysMesesOrdenados = useMemo(() => {
+    return Object.keys(gruposPorMes).sort((a, b) => b.localeCompare(a));
+  }, [gruposPorMes]);
 
   return (
     <div style={{ maxWidth: "1280px", margin: "0 auto", padding: "28px 20px" }}>
@@ -1040,7 +1164,12 @@ export default function ConciliacionPanel({
                             </div>
                           )}
                           <div style={{ fontSize: "12px", color: "rgba(20, 20, 19, 0.5)", marginTop: "2px" }}>
-                            {carpeta.confirmados_count || 0} de {carpeta.total_filas || 0} pagos conciliados ({carpeta.porcentaje || 0}%)
+                            <b>{carpeta.confirmados_count || 0}</b> de {carpeta.total_filas || 0} pagos conciliados ({carpeta.porcentaje || 0}%)
+                            {carpeta.no_identificados_count > 0 && (
+                              <span style={{ color: "#d97706", fontWeight: 600, marginLeft: "6px" }}>
+                                • {carpeta.no_identificados_count} {carpeta.no_identificados_count === 1 ? "no identificado" : "no identificados"}
+                              </span>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -1149,9 +1278,9 @@ export default function ConciliacionPanel({
                               >
                                 {/* Información de la conciliación */}
                                 <div style={{ flex: "1", minWidth: "260px" }}>
-                                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                                    <span style={{ fontSize: "14px", fontWeight: 600, color: "#111110" }}>
-                                      {ec.titulo_display}
+                                  <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                                    <span style={{ fontSize: "14px", fontWeight: 700, color: "#111110", letterSpacing: "-0.01em" }}>
+                                      {ec.titulo_rango || ec.titulo_display || ec.nombre_archivo}
                                     </span>
                                     <span
                                       style={{
@@ -1168,11 +1297,38 @@ export default function ConciliacionPanel({
                                     </span>
                                   </div>
 
+                                  {/* Subtítulo: Nombre original del archivo o título de contexto */}
                                   <div
                                     style={{
                                       display: "flex",
                                       alignItems: "center",
-                                      gap: "14px",
+                                      gap: "5px",
+                                      marginTop: "2px",
+                                      fontSize: "11.5px",
+                                      color: "rgba(20, 20, 19, 0.5)",
+                                    }}
+                                  >
+                                    <FileText size={12} style={{ opacity: 0.6, flexShrink: 0 }} />
+                                    <span
+                                      title={`Archivo original: ${ec.nombre_archivo}`}
+                                      style={{
+                                        maxWidth: "500px",
+                                        whiteSpace: "nowrap",
+                                        overflow: "hidden",
+                                        textOverflow: "ellipsis",
+                                      }}
+                                    >
+                                      {ec.titulo && ec.titulo !== ec.titulo_rango
+                                        ? `${ec.titulo} (${ec.nombre_archivo})`
+                                        : ec.nombre_archivo}
+                                    </span>
+                                  </div>
+
+                                  <div
+                                    style={{
+                                      display: "flex",
+                                      alignItems: "center",
+                                      gap: "10px",
                                       marginTop: "6px",
                                       fontSize: "12px",
                                       color: "rgba(20, 20, 19, 0.6)",
@@ -1180,15 +1336,23 @@ export default function ConciliacionPanel({
                                     }}
                                   >
                                     <span>
-                                      {ec.confirmados_count} / {ec.total_ingresos_filas || ec.total_movimientos} conciliados ({ec.porcentaje}%)
+                                      <b>{ec.conciliados_count ?? ec.confirmados_count}</b> / {ec.total_ingresos_filas || ec.total_movimientos} conciliados ({ec.porcentaje}%)
                                     </span>
+                                    {ec.no_identificados_count > 0 && (
+                                      <>
+                                        <span>•</span>
+                                        <span style={{ color: "#d97706", fontWeight: 600 }}>
+                                          {ec.no_identificados_count} {ec.no_identificados_count === 1 ? "no identificado" : "no identificados"}
+                                        </span>
+                                      </>
+                                    )}
                                     <span>•</span>
                                     <span>Total: <b>Bs. {formatCurrency(ec.total_ingresos)}</b></span>
                                     <span>•</span>
                                     <span>Subido: {new Date(ec.fecha_subida).toLocaleDateString("es-VE")}</span>
                                   </div>
 
-                                  {/* Barra de progreso */}
+                                  {/* Barra de progreso segmentada */}
                                   <div
                                     style={{
                                       width: "220px",
@@ -1197,17 +1361,31 @@ export default function ConciliacionPanel({
                                       borderRadius: "999px",
                                       marginTop: "8px",
                                       overflow: "hidden",
+                                      display: "flex",
                                     }}
                                   >
                                     <div
                                       style={{
                                         width: `${ec.porcentaje}%`,
                                         height: "100%",
-                                        background: isComplete ? "#10b981" : "#f59e0b",
-                                        borderRadius: "999px",
+                                        background: "#10b981",
+                                        borderRadius: ec.pct_no_identificados > 0 ? "999px 0 0 999px" : "999px",
                                         transition: "width 0.3s ease",
                                       }}
+                                      title={`Conciliados: ${ec.conciliados_count ?? ec.confirmados_count} (${ec.porcentaje}%)`}
                                     />
+                                    {ec.pct_no_identificados > 0 && (
+                                      <div
+                                        style={{
+                                          width: `${ec.pct_no_identificados}%`,
+                                          height: "100%",
+                                          background: "#f59e0b",
+                                          borderRadius: ec.porcentaje > 0 ? "0 999px 999px 0" : "999px",
+                                          transition: "width 0.3s ease",
+                                        }}
+                                        title={`No Identificados: ${ec.no_identificados_count} (${ec.pct_no_identificados}%)`}
+                                      />
+                                    )}
                                   </div>
                                 </div>
 
@@ -1764,6 +1942,39 @@ export default function ConciliacionPanel({
                 <SlidersHorizontal size={14} />
                 <span>¿Formato bancario no reconocido o columnas desordenadas? <b>Mapear interactivamente</b></span>
               </button>
+
+              <a
+                href={getPlantillaConciliacionExcelUrl()}
+                download="plantilla_conciliacion_bancaria.xlsx"
+                title="Descarga un formato oficial en Excel para rellenar tus pagos manualmente y que el sistema siempre los reconozca"
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "7px",
+                  padding: "7px 16px",
+                  borderRadius: "8px",
+                  background: "rgba(16, 185, 129, 0.08)",
+                  color: "#065f46",
+                  border: "1px solid rgba(16, 185, 129, 0.35)",
+                  fontSize: "12px",
+                  fontWeight: 600,
+                  textDecoration: "none",
+                  cursor: "pointer",
+                  transition: "all 0.15s ease",
+                  marginTop: "2px",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "rgba(16, 185, 129, 0.16)";
+                  e.currentTarget.style.borderColor = "#10b981";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "rgba(16, 185, 129, 0.08)";
+                  e.currentTarget.style.borderColor = "rgba(16, 185, 129, 0.35)";
+                }}
+              >
+                <FileSpreadsheet size={15} color="#059669" />
+                <span>📥 Descargar plantilla Excel (.xlsx) para rellenar manualmente</span>
+              </a>
             </div>
           </div>
         </div>
@@ -2062,9 +2273,35 @@ export default function ConciliacionPanel({
               ))}
             </div>
 
-            {/* Buscador inline */}
-            <div style={{ display: "flex", alignItems: "center", gap: "8px", flex: "1", maxWidth: "260px" }}>
-              <div style={{ position: "relative", width: "100%" }}>
+            {/* Lado derecho: Aprobación en Lote y Buscador alineado a la derecha */}
+            <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap", marginLeft: "auto" }}>
+              {/* Aprobación en Lote */}
+              {highConfidencePending > 0 && (
+                <button
+                  type="button"
+                  onClick={handleBatchConfirmHighConfidence}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    padding: "7px 14px",
+                    borderRadius: "8px",
+                    border: "1px solid rgba(16, 185, 129, 0.3)",
+                    background: "rgba(16, 185, 129, 0.08)",
+                    color: "#065f46",
+                    fontSize: "12.5px",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    transition: "background 0.15s ease",
+                  }}
+                >
+                  <CheckCheck size={15} />
+                  <span>Aprobar {highConfidencePending} sugerencias (&gt;70%)</span>
+                </button>
+              )}
+
+              {/* Buscador siempre a la derecha */}
+              <div style={{ position: "relative", width: "260px" }}>
                 <Search
                   size={14}
                   style={{
@@ -2084,7 +2321,7 @@ export default function ConciliacionPanel({
                   style={{
                     width: "100%",
                     paddingLeft: "30px",
-                    paddingRight: "10px",
+                    paddingRight: searchTerm ? "28px" : "10px",
                     paddingTop: "7px",
                     paddingBottom: "7px",
                     borderRadius: "8px",
@@ -2096,32 +2333,31 @@ export default function ConciliacionPanel({
                     boxSizing: "border-box",
                   }}
                 />
+                {searchTerm && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchTerm("")}
+                    title="Limpiar búsqueda"
+                    style={{
+                      position: "absolute",
+                      right: "7px",
+                      top: "50%",
+                      transform: "translateY(-50%)",
+                      background: "transparent",
+                      border: "none",
+                      color: "rgba(20, 20, 19, 0.4)",
+                      cursor: "pointer",
+                      padding: "2px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <X size={13} />
+                  </button>
+                )}
               </div>
             </div>
-
-            {/* Aprobación en Lote */}
-            {highConfidencePending > 0 && (
-              <button
-                type="button"
-                onClick={handleBatchConfirmHighConfidence}
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "6px",
-                  padding: "8px 14px",
-                  borderRadius: "10px",
-                  border: "1px solid rgba(16, 185, 129, 0.3)",
-                  background: "rgba(16, 185, 129, 0.08)",
-                  color: "#065f46",
-                  fontSize: "13px",
-                  fontWeight: 600,
-                  cursor: "pointer",
-                }}
-              >
-                <CheckCheck size={16} />
-                <span>Aprobar {highConfidencePending} sugerencias (&gt;70%)</span>
-              </button>
-            )}
           </div>
 
           {/* Tabla de Movimientos Bancarios */}
@@ -2142,14 +2378,14 @@ export default function ConciliacionPanel({
                   <th style={{ padding: "12px 16px", fontWeight: 600, color: "#111110", width: "120px", textAlign: "right" }}>
                     Monto (Haber)
                   </th>
-                  <th style={{ padding: "12px 16px", fontWeight: 600, color: "#111110", width: "160px" }}>
+                  <th style={{ padding: "12px 16px", fontWeight: 600, color: "#111110", width: "150px" }}>
                     Sugerencia IA
                   </th>
-                  <th style={{ padding: "12px 16px", fontWeight: 600, color: "#111110", width: "150px" }}>
+                  <th style={{ padding: "12px 16px", fontWeight: 600, color: "#111110", width: "220px" }}>
                     Asignar Inmueble
                   </th>
-                  <th style={{ padding: "12px 16px", fontWeight: 600, color: "#111110", width: "120px" }}>Tipo</th>
-                  <th style={{ padding: "12px 16px", fontWeight: 600, color: "#111110", textAlign: "center", width: "80px" }}>
+                  <th style={{ padding: "12px 16px", fontWeight: 600, color: "#111110", width: "110px" }}>Tipo</th>
+                  <th style={{ padding: "12px 16px", fontWeight: 600, color: "#111110", textAlign: "center", width: "90px" }}>
                     Estado
                   </th>
                 </tr>
@@ -2171,11 +2407,21 @@ export default function ConciliacionPanel({
                         m.inmueble_confirmado_identificador === "No Identificado");
                     const isNoAplica = isConfirmed && !m.inmueble_confirmado_id && !isNoIdentificado;
 
-                    const activeInmId = isNoIdentificado
-                      ? "no_identificado"
-                      : isNoAplica
-                      ? "no_aplica"
-                      : m.inmueble_confirmado_id || m.inmueble_sugerido_id || "";
+                    const savedVal = isConfirmed
+                      ? isNoAplica
+                        ? "no_aplica"
+                        : isNoIdentificado
+                        ? "no_identificado"
+                        : String(m.inmueble_confirmado_id || "")
+                      : "";
+
+                    const selectedInmVal = seleccionesInmuebles[m.id] !== undefined
+                      ? seleccionesInmuebles[m.id]
+                      : (isConfirmed ? savedVal : (m.inmueble_sugerido_id ? String(m.inmueble_sugerido_id) : ""));
+
+                    const hayCambioPendiente = seleccionesInmuebles[m.id] !== undefined && seleccionesInmuebles[m.id] !== savedVal;
+
+                    const activeInmId = selectedInmVal;
 
                     // Colores según estado y tipo de asignación (Gris para No Aplica, Ámbar para No Identificado, Verde para Inmuebles)
                     let rowBg = "transparent";
@@ -2213,6 +2459,8 @@ export default function ConciliacionPanel({
                           borderBottom: rowBorderBottom,
                           background: rowBg,
                           transition: "background 0.15s ease",
+                          contentVisibility: "auto",
+                          containIntrinsicSize: "0 54px",
                         }}
                         onMouseEnter={(e) => {
                           e.currentTarget.style.background = rowHoverBg;
@@ -2343,58 +2591,107 @@ export default function ConciliacionPanel({
 
                         {/* Asignar Inmueble Manual con opciones "No Aplica" y "No Identificado" */}
                         <td style={{ padding: "12px 16px" }}>
-                          <select
-                            value={activeInmId}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              if (val === "no_aplica") {
-                                handleConfirmRow(m, null, m.clasificacion_especial === "No Identificado" ? "No Aplica" : (m.clasificacion_especial || "No Aplica"));
-                              } else if (val === "no_identificado") {
-                                handleConfirmRow(m, null, "No Identificado");
-                              } else if (val) {
-                                const cleanEsp = (m.clasificacion_especial === "No Identificado" || m.clasificacion_especial === "No Aplica") ? "" : m.clasificacion_especial;
-                                handleConfirmRow(m, parseInt(val), cleanEsp);
-                              } else if (isConfirmed) {
-                                handleRevertRow(m);
-                              }
-                            }}
-                            style={{
-                              width: "100%",
-                              padding: "6px 8px",
-                              borderRadius: "6px",
-                              border: isConfirmed
-                                ? isNoAplica
-                                  ? "1px solid #94a3b8"
+                          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                            <select
+                              value={selectedInmVal}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setSeleccionesInmuebles((prev) => ({ ...prev, [m.id]: val }));
+                              }}
+                              style={{
+                                flex: 1,
+                                minWidth: 0,
+                                width: "100%",
+                                padding: "6px 8px",
+                                borderRadius: "6px",
+                                border: hayCambioPendiente
+                                  ? "2px solid #059669"
+                                  : isConfirmed
+                                  ? isNoAplica
+                                    ? "1px solid #94a3b8"
+                                    : isNoIdentificado
+                                    ? "1px solid #f59e0b"
+                                    : "1px solid #10b981"
+                                  : "1px solid rgba(0, 0, 0, 0.15)",
+                                background: hayCambioPendiente
+                                  ? "rgba(16, 185, 129, 0.05)"
+                                  : isNoAplica
+                                  ? "#e2e8f0"
                                   : isNoIdentificado
-                                  ? "1px solid #f59e0b"
-                                  : "1px solid #10b981"
-                                : "1px solid rgba(0, 0, 0, 0.15)",
-                              background: isNoAplica
-                                ? "#e2e8f0"
-                                : isNoIdentificado
-                                ? "#fef3c7"
-                                : "#ffffff",
-                              color: isNoAplica
-                                ? "#334155"
-                                : isNoIdentificado
-                                ? "#92400e"
-                                : "#111110",
-                              fontWeight: isNoAplica || isNoIdentificado ? 600 : 400,
-                              fontSize: "12.5px",
-                              outline: "none",
-                              fontFamily: "var(--font-mono)",
-                              cursor: "pointer",
-                            }}
-                          >
-                            <option value="">Seleccionar...</option>
-                            <option value="no_aplica">🚫 No Aplica (Interés / Operacional)</option>
-                            <option value="no_identificado">❓ No Identificado (Por Verificar)</option>
-                            {inmuebles.map((inm) => (
-                              <option key={inm.id} value={inm.id}>
-                                {inm.identificador} - {inm.propietario}
-                              </option>
-                            ))}
-                          </select>
+                                  ? "#fef3c7"
+                                  : "#ffffff",
+                                color: isNoAplica
+                                  ? "#334155"
+                                  : isNoIdentificado
+                                  ? "#92400e"
+                                  : "#111110",
+                                fontWeight: isNoAplica || isNoIdentificado || hayCambioPendiente ? 600 : 400,
+                                fontSize: "12.5px",
+                                outline: "none",
+                                fontFamily: "var(--font-mono)",
+                                cursor: "pointer",
+                              }}
+                            >
+                              <option value="">Seleccionar...</option>
+                              <option value="no_aplica">🚫 No Aplica (Interés / Operacional)</option>
+                              <option value="no_identificado">❓ No Identificado (Por Verificar)</option>
+                              {inmueblesOptions}
+                            </select>
+
+                            {/* Botón Aceptar compacto inline (solo icono ✓ de 28px) cuando el usuario cambia la opción */}
+                            {hayCambioPendiente && (
+                              <div style={{ display: "flex", alignItems: "center", gap: "3px", flexShrink: 0 }}>
+                                <button
+                                  type="button"
+                                  onClick={() => handleConfirmarSeleccion(m, selectedInmVal)}
+                                  title="Aceptar y confirmar selección"
+                                  style={{
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    width: "28px",
+                                    height: "28px",
+                                    borderRadius: "6px",
+                                    background: "#059669",
+                                    color: "#ffffff",
+                                    border: "none",
+                                    cursor: "pointer",
+                                    boxShadow: "0 1px 3px rgba(5, 150, 105, 0.3)",
+                                    flexShrink: 0,
+                                    transition: "background 0.15s ease",
+                                  }}
+                                  onMouseEnter={(e) => (e.currentTarget.style.background = "#047857")}
+                                  onMouseLeave={(e) => (e.currentTarget.style.background = "#059669")}
+                                >
+                                  <Check size={16} strokeWidth={2.5} />
+                                </button>
+                                {isConfirmed && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleCancelarSeleccion(m.id)}
+                                    title="Descartar cambio y restaurar asignación"
+                                    style={{
+                                      display: "inline-flex",
+                                      alignItems: "center",
+                                      justifyContent: "center",
+                                      width: "24px",
+                                      height: "28px",
+                                      borderRadius: "6px",
+                                      background: "transparent",
+                                      color: "rgba(20, 20, 19, 0.4)",
+                                      border: "1px solid rgba(0, 0, 0, 0.12)",
+                                      cursor: "pointer",
+                                      flexShrink: 0,
+                                    }}
+                                    onMouseEnter={(e) => (e.currentTarget.style.color = "#dc2626")}
+                                    onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(20, 20, 19, 0.4)")}
+                                  >
+                                    <X size={13} />
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                          </div>
                         </td>
 
                         {/* Clasificación Especial (Ej: Caney) */}
@@ -2438,69 +2735,86 @@ export default function ConciliacionPanel({
 
                         {/* Estado / Acción rápida */}
                         <td style={{ padding: "12px 16px", textAlign: "center" }}>
-                          {isConfirmed ? (
-                            isNoAplica ? (
-                              <div
-                                title="Conciliado como No Aplica"
+                          {isConfirmed && !hayCambioPendiente ? (
+                            <div style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "6px" }}>
+                              {isNoAplica ? (
+                                <div
+                                  title="Conciliado como No Aplica"
+                                  style={{
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    gap: "4px",
+                                    color: "#64748b",
+                                    fontSize: "12px",
+                                    fontWeight: 600,
+                                  }}
+                                >
+                                  <CheckCircle2 size={16} />
+                                </div>
+                              ) : isNoIdentificado ? (
+                                <div
+                                  title="Marcado como No Identificado (Pendiente por verificar)"
+                                  style={{
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    gap: "4px",
+                                    color: "#d97706",
+                                    fontSize: "12px",
+                                    fontWeight: 600,
+                                  }}
+                                >
+                                  <AlertCircle size={16} />
+                                </div>
+                              ) : (
+                                <div
+                                  title="Confirmado y aprendido por el sistema"
+                                  style={{
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    gap: "4px",
+                                    color: "#059669",
+                                    fontSize: "12px",
+                                    fontWeight: 500,
+                                  }}
+                                >
+                                  <CheckCircle2 size={16} />
+                                </div>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => handleRevertRow(m)}
+                                title="Restablecer a pendiente"
                                 style={{
+                                  background: "transparent",
+                                  border: "none",
+                                  color: "rgba(20, 20, 19, 0.3)",
+                                  cursor: "pointer",
+                                  padding: "2px",
                                   display: "inline-flex",
                                   alignItems: "center",
-                                  gap: "4px",
-                                  color: "#64748b",
-                                  fontSize: "12px",
-                                  fontWeight: 600,
                                 }}
+                                onMouseEnter={(e) => (e.currentTarget.style.color = "#dc2626")}
+                                onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(20, 20, 19, 0.3)")}
                               >
-                                <CheckCircle2 size={16} />
-                              </div>
-                            ) : isNoIdentificado ? (
-                              <div
-                                title="Marcado como No Identificado (Pendiente por verificar)"
-                                style={{
-                                  display: "inline-flex",
-                                  alignItems: "center",
-                                  gap: "4px",
-                                  color: "#d97706",
-                                  fontSize: "12px",
-                                  fontWeight: 600,
-                                }}
-                              >
-                                <AlertCircle size={16} />
-                              </div>
-                            ) : (
-                              <div
-                                title="Confirmado y aprendido por el sistema"
-                                style={{
-                                  display: "inline-flex",
-                                  alignItems: "center",
-                                  gap: "4px",
-                                  color: "#059669",
-                                  fontSize: "12px",
-                                  fontWeight: 500,
-                                }}
-                              >
-                                <CheckCircle2 size={16} />
-                              </div>
-                            )
+                                <RotateCcw size={13} />
+                              </button>
+                            </div>
                           ) : (
                             <button
                               type="button"
-                              onClick={() => {
-                                if (m.inmueble_sugerido_id) {
-                                  handleConfirmRow(m, m.inmueble_sugerido_id, (m.clasificacion_especial === "No Identificado" || m.clasificacion_especial === "No Aplica") ? "" : m.clasificacion_especial);
-                                }
-                              }}
-                              disabled={!m.inmueble_sugerido_id}
-                              title={m.inmueble_sugerido_id ? "Aceptar sugerencia y aprender" : "Selecciona un inmueble"}
+                              onClick={() => handleConfirmarSeleccion(m, selectedInmVal)}
+                              disabled={!selectedInmVal}
+                              title={selectedInmVal ? "Aceptar y confirmar" : "Selecciona un inmueble primero"}
                               style={{
-                                padding: "6px 10px",
+                                padding: "6px 12px",
                                 borderRadius: "6px",
                                 border: "1px solid rgba(0, 0, 0, 0.12)",
-                                background: m.inmueble_sugerido_id ? "#111110" : "rgba(0, 0, 0, 0.05)",
-                                color: m.inmueble_sugerido_id ? "#ffffff" : "rgba(20, 20, 19, 0.3)",
+                                background: selectedInmVal ? "#111110" : "rgba(0, 0, 0, 0.05)",
+                                color: selectedInmVal ? "#ffffff" : "rgba(20, 20, 19, 0.3)",
                                 fontSize: "11.5px",
-                                fontWeight: 500,
-                                cursor: m.inmueble_sugerido_id ? "pointer" : "not-allowed",
+                                fontWeight: 600,
+                                cursor: selectedInmVal ? "pointer" : "not-allowed",
+                                transition: "all 0.15s ease",
                               }}
                             >
                               Aceptar

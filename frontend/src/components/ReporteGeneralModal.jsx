@@ -40,6 +40,7 @@ export default function ReporteGeneralModal({
   const [filtroEstado, setFiltroEstado] = useState("todos"); // 'todos' | 'confirmado' | 'pendiente' | 'no_identificado' | 'descartado'
   const [carpetaSeleccionada, setCarpetaSeleccionada] = useState("");
   const [busquedaTexto, setBusquedaTexto] = useState("");
+  const [ocultarNegativos, setOcultarNegativos] = useState(true);
 
   // Datos
   const [movimientosOriginales, setMovimientosOriginales] = useState([]);
@@ -80,6 +81,7 @@ export default function ReporteGeneralModal({
       if (filtroEstado) params.estado = filtroEstado;
       if (carpetaSeleccionada) params.carpetaId = carpetaSeleccionada;
       if (busquedaTexto) params.busqueda = busquedaTexto;
+      params.ocultarNegativos = ocultarNegativos;
 
       const data = await fetchReporteMovimientos(condominio.id, params);
       setMovimientosOriginales(data.movimientos || []);
@@ -143,8 +145,10 @@ export default function ReporteGeneralModal({
 
   // Lista de movimientos activos en el preview
   const movimientosActivos = useMemo(() => {
-    return movimientosOriginales.filter((m) => !filasExcluidasIds.has(m.id));
-  }, [movimientosOriginales, filasExcluidasIds]);
+    return movimientosOriginales
+      .filter((m) => !filasExcluidasIds.has(m.id))
+      .filter((m) => !ocultarNegativos || (parseFloat(m.monto) > 0));
+  }, [movimientosOriginales, filasExcluidasIds, ocultarNegativos]);
 
   // Totales en vivo
   const totalMontoActivo = useMemo(() => {
@@ -424,6 +428,34 @@ export default function ReporteGeneralModal({
                 </select>
               </div>
             )}
+
+            {/* Toggle Ocultar saldos negativos */}
+            <label
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "7px",
+                padding: "5px 11px",
+                borderRadius: "6px",
+                background: ocultarNegativos ? "rgba(16, 185, 129, 0.08)" : "rgba(0, 0, 0, 0.04)",
+                border: ocultarNegativos ? "1px solid rgba(16, 185, 129, 0.35)" : "1px solid rgba(0, 0, 0, 0.12)",
+                color: ocultarNegativos ? "#065f46" : "var(--color-fg-muted, #475569)",
+                fontSize: "12px",
+                fontWeight: 600,
+                cursor: "pointer",
+                userSelect: "none",
+                transition: "all 0.15s ease",
+              }}
+              title="Oculta débitos bancarios, comisiones y saldos negativos que usualmente no aplican a la conciliación de ingresos"
+            >
+              <input
+                type="checkbox"
+                checked={ocultarNegativos}
+                onChange={(e) => setOcultarNegativos(e.target.checked)}
+                style={{ cursor: "pointer", accentColor: "#10b981" }}
+              />
+              <span>Ocultar saldos negativos</span>
+            </label>
 
             {/* Botón Aplicar Filtros */}
             <button
