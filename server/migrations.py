@@ -210,6 +210,29 @@ def run_db_upgrades():
         cursor.execute(idx_sql)
     print(f"[INDEXES] Creados {len(indexes)} índices de alto rendimiento en SQLite.")
 
+    # 10. Saneamiento de referencias con notación científica y corrección de bancos mal etiquetados
+    from server.ref_utils import sanitize_reference
+    cursor.execute("SELECT id, referencia, descripcion FROM movimientos WHERE instr(lower(referencia), 'e+') > 0 OR instr(lower(referencia), 'e-') > 0")
+    bad_refs = cursor.fetchall()
+    repaired_refs = []
+    for row in bad_refs:
+        clean = sanitize_reference(row["referencia"], desc=row["descripcion"])
+        if clean != row["referencia"]:
+            repaired_refs.append((clean, row["id"]))
+    if repaired_refs:
+        cursor.executemany("UPDATE movimientos SET referencia = ? WHERE id = ?", repaired_refs)
+        print(f"[MIGRATION] Saneadas {len(repaired_refs)} referencias con notación científica en movimientos.")
+
+    # Corregir estados_cuenta con descripciones de 100%Banco etiquetados como BNC
+    cursor.execute("SELECT id, nombre_archivo FROM estados_cuenta WHERE banco = 'BNC'")
+    bnc_ecs = cursor.fetchall()
+    for b_ec in bnc_ecs:
+        cursor.execute("SELECT descripcion FROM movimientos WHERE estado_cuenta_id = ? LIMIT 20", (b_ec["id"],))
+        descs = " ".join([r["descripcion"] or "" for r in cursor.fetchall()]).upper()
+        if "100%BANCO" in descs or "CREDITO INMEDIATO" in descs or "100%PAGOMOVIL" in descs:
+            cursor.execute("UPDATE estados_cuenta SET banco = '100%Banco' WHERE id = ?", (b_ec["id"],))
+            print(f"[MIGRATION] Corregido banco de estado_cuenta {b_ec['id']} ({b_ec['nombre_archivo']}) a 100%Banco.")
+
     conn.commit()
     conn.close()
     print("[MIGRATION & CLEANUP] Proceso completado exitosamente.")

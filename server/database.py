@@ -218,6 +218,22 @@ def init_db():
           AND clasificacion_especial IN ('No Identificado', 'no_identificado')
     ''')
 
+    # Saneamiento defensivo: reparar referencias con notación científica residual de Excel
+    try:
+        from server.ref_utils import sanitize_reference
+        cursor.execute("SELECT id, referencia, descripcion FROM movimientos WHERE instr(lower(referencia), 'e+') > 0 OR instr(lower(referencia), 'e-') > 0")
+        bad_refs = cursor.fetchall()
+        if bad_refs:
+            repaired = []
+            for r in bad_refs:
+                clean = sanitize_reference(r["referencia"], desc=r["descripcion"])
+                if clean != r["referencia"]:
+                    repaired.append((clean, r["id"]))
+            if repaired:
+                cursor.executemany("UPDATE movimientos SET referencia = ? WHERE id = ?", repaired)
+    except Exception:
+        pass
+
     # Índices de alto rendimiento para consultas instantáneas y navegación sin lag
     indexes = [
         "CREATE INDEX IF NOT EXISTS idx_movimientos_condominio ON movimientos(condominio_id)",

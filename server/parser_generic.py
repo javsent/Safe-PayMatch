@@ -21,6 +21,7 @@ import openpyxl
 from typing import List, Dict, Any, Optional, Tuple
 from server.parser_bnc import clean_text, parse_amount, extract_metadata_from_description, correlate_comisiones
 from server.date_utils import parse_and_normalize_date, fix_swapped_dates_in_movements
+from server.ref_utils import sanitize_reference
 
 
 # ---------------------------------------------------------------------------
@@ -164,7 +165,8 @@ def _build_movimiento(r: List[str], col_map: Dict[str, int], default_meta: Dict 
         return None
 
     desc = get("descripcion")
-    ref = get("referencia")
+    raw_ref = get("referencia")
+    ref = sanitize_reference(raw_ref, desc=desc)
     saldo = parse_amount(get("saldo"))
 
     meta = extract_metadata_from_description(desc)

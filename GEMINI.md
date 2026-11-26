@@ -2,6 +2,12 @@
 
 ## ✅ FUNCIONALIDADES IMPLEMENTADAS RECIENTEMENTE
 
+### 🔢 Saneamiento de Referencias con Notación Científica y Auto-Detección 100%Banco (COMPLETADO v1.4.2)
+- **Eliminación total de notación científica en referencias:** Módulo centralizado `server/ref_utils.py` que detecta y corrige floats de Excel con exponente (`5.13420261116075e+19`) y decimales artificiales (`.0`).
+- **Rescate inteligente desde descripción contable:** Para extractos de 100%Banco y Pago Móvil, rescata la referencia original de 8 dígitos (`07540324`, `23975700`, etc.) preservada íntegramente en la descripción de "Crédito Inmediato" o comisiones bancarias.
+- **Auto-detección bancaria en Excel/CSV:** Si el banco está configurado en "auto", el enrutador inspecciona el contenido de las transacciones para clasificar correctamente archivos de 100%Banco y Banco Exterior en lugar de asumir BNC ciegamente.
+- **Saneamiento automático en inicio y migraciones:** Rutina de auto-reparación en `database.py:init_db()` y `migrations.py` que corrige cualquier movimiento histórico corrupto en SQLite.
+
 ### 🕒 Indicador de Última Conciliación y Orden por Prioridad (COMPLETADO)
 - **Fecha de última conciliación en tarjeta:** Cada condominio en el panel de selección muestra a un costado la fecha y hora relativa de su último extracto bancario procesado (ej. *Hoy (1:18 p. m.)*, *Hace 4 días*, o en ámbar *Sin conciliar aún*).
 - **Selector inteligente de ordenamiento:** Barra de herramientas superior que permite alternar entre:

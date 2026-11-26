@@ -6,12 +6,7 @@ from server.parser_bnc import parse_excel_or_csv, parse_bnc_pdf
 from server.parser_exterior import parse_exterior_pdf
 from server.parser_100banco import parse_100banco_pdf
 from server.parser_generic import parse_generic
-
-def normalize_ref(ref: Any) -> str:
-    """Normaliza una referencia bancaria eliminando ceros a la izquierda para comparar entre PDF oficial y Excel."""
-    s = str(ref or "").strip()
-    clean = re.sub(r"^0+", "", s)
-    return clean if clean else "0"
+from server.ref_utils import sanitize_reference, normalize_ref
 
 def deduplicate_movements(movimientos_list: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """
@@ -35,8 +30,8 @@ def deduplicate_movements(movimientos_list: List[Dict[str, Any]]) -> List[Dict[s
         return score
 
     for mov in movimientos_list:
-        raw_ref = str(mov.get("referencia", "")).strip()
-        ref_norm = normalize_ref(raw_ref)
+        raw_ref = sanitize_reference(mov.get("referencia", ""), mov.get("descripcion", ""))
+        ref_norm = normalize_ref(raw_ref, mov.get("descripcion", ""))
         haber = round(float(mov.get("haber", 0.0) or 0.0), 2)
         debe = round(float(mov.get("debe", 0.0) or 0.0), 2)
         fecha = str(mov.get("fecha", "")).strip()
@@ -49,20 +44,20 @@ def deduplicate_movements(movimientos_list: List[Dict[str, Any]]) -> List[Dict[s
             key = (ref_norm, haber, debe)
 
         if key not in groups:
-            # Asegurar que la referencia guardada esté limpia
-            mov["referencia"] = ref_norm if ref_norm != "0" else raw_ref
+            # Asegurar que la referencia guardada esté limpia y saneada
+            mov["referencia"] = raw_ref if raw_ref not in ["", "0"] else ref_norm
             groups[key] = mov
         else:
             existing_mov = groups[key]
             # Si el nuevo tiene inmueble y el existente no: gana el nuevo
             if mov.get("inmueble_asignado_historico") and not existing_mov.get("inmueble_asignado_historico"):
-                mov["referencia"] = ref_norm if ref_norm != "0" else raw_ref
+                mov["referencia"] = raw_ref if raw_ref not in ["", "0"] else ref_norm
                 groups[key] = mov
             elif not mov.get("inmueble_asignado_historico") and existing_mov.get("inmueble_asignado_historico"):
                 # Gana el existente, descartar el nuevo sin datos
                 pass
             elif score_richness(mov) > score_richness(existing_mov):
-                mov["referencia"] = ref_norm if ref_norm != "0" else raw_ref
+                mov["referencia"] = raw_ref if raw_ref not in ["", "0"] else ref_norm
                 groups[key] = mov
 
     return list(groups.values())
@@ -91,10 +86,18 @@ def detect_bank_and_parse(
         elif selected_bank not in ["auto", ""]:
             banco = bank_hint.strip()
         else:
-            banco = "BNC"
-        # Normalizar referencias
+            # Auto-detección en Excel/CSV a partir de descripciones de movimientos
+            sample_desc = " ".join([str(m.get("descripcion", "")) for m in movimientos[:30]]).upper()
+            if "100%BANCO" in sample_desc or "100%PAGOMOVIL" in sample_desc or "CREDITO INMEDIATO" in sample_desc or "100% BANCO" in sample_desc:
+                banco = "100%Banco"
+            elif "BANCO EXTERIOR" in sample_desc or "EXTERIOR" in sample_desc:
+                banco = "Banco Exterior"
+            else:
+                banco = "BNC"
+
+        # Sanear y normalizar referencias
         for m in movimientos:
-            m["referencia"] = normalize_ref(m.get("referencia", ""))
+            m["referencia"] = sanitize_reference(m.get("referencia", ""), m.get("descripcion", ""))
         return banco, movimientos
 
     sample_text = ""

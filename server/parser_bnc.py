@@ -4,10 +4,14 @@ import io
 import openpyxl
 from typing import List, Dict, Any, Optional
 from server.date_utils import parse_and_normalize_date, fix_swapped_dates_in_movements
+from server.ref_utils import sanitize_reference
 
-def clean_text(text: Optional[str]) -> str:
-    if not text:
+def clean_text(text: Any) -> str:
+    if text is None:
         return ""
+    if isinstance(text, float):
+        if text.is_integer() and "e" not in str(text).lower():
+            return str(int(text))
     # Reemplazar múltiples espacios y saltos de línea por un solo espacio
     return re.sub(r"\s+", " ", str(text)).strip()
 
@@ -207,7 +211,8 @@ def parse_excel_or_csv(file_bytes: bytes, filename: str) -> List[Dict[str, Any]]
 
         tipo_op = r[col_map.get("tipo_operacion", 1)] if "tipo_operacion" in col_map and col_map["tipo_operacion"] < len(r) else "Movimiento"
         desc = r[col_map.get("descripcion", 2)] if "descripcion" in col_map and col_map["descripcion"] < len(r) else ""
-        ref = r[col_map.get("referencia", 3)] if "referencia" in col_map and col_map["referencia"] < len(r) else ""
+        raw_ref = r[col_map.get("referencia", 3)] if "referencia" in col_map and col_map["referencia"] < len(r) else ""
+        ref = sanitize_reference(raw_ref, desc=desc)
         debe = parse_amount(r[col_map.get("debe", 4)]) if "debe" in col_map and col_map["debe"] < len(r) else 0.0
         haber = parse_amount(r[col_map.get("haber", 5)]) if "haber" in col_map and col_map["haber"] < len(r) else 0.0
         saldo = parse_amount(r[col_map.get("saldo", 6)]) if "saldo" in col_map and col_map["saldo"] < len(r) else 0.0
